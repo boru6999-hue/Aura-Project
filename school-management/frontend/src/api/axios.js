@@ -1,36 +1,22 @@
-import axios from 'axios';
+import axios from 'axios'
 
-const api = axios.create({
-  baseURL: '/api',
-  headers: { 'Content-Type': 'application/json' },
-});
+const api = axios.create({ baseURL: 'http://localhost:5000/api', withCredentials: true })
 
-// ── REQUEST interceptor: attach JWT on EVERY request ──────────────────────────
-api.interceptors.request.use(
-  (config) => {
-    const token = localStorage.getItem('token');
-    if (token) {
-      config.headers['Authorization'] = `Bearer ${token}`;
-    }
-    return config;
-  },
-  (error) => Promise.reject(error)
-);
+api.interceptors.request.use(cfg => {
+  const token = localStorage.getItem('token')
+  if (token) cfg.headers.Authorization = `Bearer ${token}`
+  return cfg
+})
 
-// ── RESPONSE interceptor: handle 401 globally ─────────────────────────────────
 api.interceptors.response.use(
-  (response) => response,
-  (error) => {
-    if (error.response?.status === 401) {
-      // Token expired or invalid — clear session and redirect to login
-      localStorage.removeItem('token');
-      localStorage.removeItem('user');
-      if (window.location.pathname !== '/login') {
-        window.location.href = '/login';
-      }
+  r => r,
+  err => {
+    if (err.response?.status === 401) {
+      localStorage.removeItem('token')
+      window.location.href = '/login'
     }
-    return Promise.reject(error);
+    return Promise.reject(err)
   }
-);
+)
 
-export default api;
+export default api

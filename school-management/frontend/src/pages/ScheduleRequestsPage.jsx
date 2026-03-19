@@ -1,289 +1,274 @@
-import { useState, useEffect, useCallback } from 'react';
-import api from '../api/axios';
-import { useToast } from '../components/Toast';
-import Modal from '../components/Modal';
+import { useState, useEffect, useCallback } from 'react'
+import api from '../api/axios'
+import { useToast } from '../components/Toast'
+import Modal from '../components/Modal'
+import { PageHeader, SkeletonTable, Empty, ActBtn, Spinner } from '../components/UI'
 
-const DAYS = ['Даваа', 'Мягмар', 'Лхагва', 'Пүрэв', 'Баасан', 'Бямба', 'Ням'];
+const DAYS = ['Даваа','Мягмар','Лхагва','Пүрэв','Баасан','Бямба','Ням']
+const S_CLS = {
+  PENDING:  { cls:'badge-amber', label:'ХҮЛЭЭГДЭЖ БУЙ' },
+  APPROVED: { cls:'badge-green', label:'ЗӨВШӨӨРСӨН' },
+  REJECTED: { cls:'badge-red',   label:'ТАТГАЛЗСАН' },
+}
 
-const STATUS_CONFIG = {
-  PENDING:  { label: 'Хүлээгдэж байна', bg: '#fef3c7', color: '#d97706', dot: '#f59e0b' },
-  APPROVED: { label: 'Батлагдсан',       bg: '#d1fae5', color: '#065f46', dot: '#10b981' },
-  REJECTED: { label: 'Татгалзсан',       bg: '#fee2e2', color: '#7f1d1d', dot: '#ef4444' },
-};
+// Detect grade-change requests by note prefix
+const isGradeReq = r => r.note?.startsWith('[ДҮНГИЙН ЗАСВАРЫН ХҮСЭЛТ]')
 
-const CSS = `
-  @import url('https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Mono:wght@400;500&display=swap');
+function parseGradeNote(note) {
+  // Format: [ДҮНГИЙН ЗАСВАРЫН ХҮСЭЛТ] Сурагч: ... | Хичээл: ... | Одоогийн: X (G) → Шинэ: Y (H) | Тайлбар: ...
+  try {
+    const student = note.match(/Сурагч: ([^|]+)/)?.[1]?.trim()
+    const course  = note.match(/Хичээл: ([^|]+)/)?.[1]?.trim()
+    const change  = note.match(/Одоогийн: ([^|]+)/)?.[1]?.trim()
+    const reason  = note.match(/Тайлбар: (.+)/)?.[1]?.trim()
+    return { student, course, change, reason }
+  } catch { return {} }
+}
 
-  .req-root { font-family:'Syne',sans-serif; background:#0a0e1a; min-height:100vh; padding:28px 24px; color:#e8eaf0; }
-  .req-header { display:flex; align-items:flex-start; justify-content:space-between; flex-wrap:wrap; gap:16px; margin-bottom:28px; }
-  .req-header h1 { font-size:26px; font-weight:800; color:#fff; margin:0; letter-spacing:-0.5px; }
-  .req-header .subtitle { font-family:'DM Mono',monospace; font-size:11px; color:#00d4ff; margin-top:6px; letter-spacing:0.08em; }
+function ApproveModal({ item, onClose, onDone }) {
+  const { show: toast } = useToast()
+  const [adminNote, setAdminNote] = useState('')
+  const [saving, setSaving]       = useState(false)
+  const isGrade = isGradeReq(item)
+  const parsed  = isGrade ? parseGradeNote(item.note) : null
 
-  .filter-tabs { display:flex; gap:6px; flex-wrap:wrap; }
-  .filter-tab { padding:7px 16px; border-radius:4px; font-size:12px; font-weight:700; cursor:pointer; border:1.5px solid; transition:all 0.15s; font-family:'DM Mono',monospace; }
-  .filter-tab-on  { background:#00d4ff; color:#001a20; border-color:#00d4ff; box-shadow:0 0 12px rgba(0,212,255,0.35); }
-  .filter-tab-off { background:transparent; color:#556; border-color:#1e2535; }
-  .filter-tab-off:hover { border-color:#00d4ff44; color:#00d4ff88; }
-
-  .badge-pending  { background:#fef3c744; color:#f59e0b; border:1px solid #f59e0b44; }
-  .badge-approved { background:#d1fae544; color:#10b981; border:1px solid #10b98144; }
-  .badge-rejected { background:#fee2e244; color:#ef4444; border:1px solid #ef444444; }
-
-  .req-list { display:flex; flex-direction:column; gap:10px; }
-
-  .req-card {
-    background:#111827; border:1px solid #1e2a3a; border-radius:12px; padding:18px 20px;
-    display:flex; flex-direction:column; gap:12px; transition:border-color 0.15s;
-  }
-  .req-card:hover { border-color:#00d4ff33; }
-  .req-card-top { display:flex; align-items:flex-start; justify-content:space-between; gap:12px; flex-wrap:wrap; }
-  .req-teacher { display:flex; align-items:center; gap:10px; }
-  .req-avatar {
-    width:38px; height:38px; border-radius:8px; background:linear-gradient(135deg,#6366f1,#4338ca);
-    display:flex; align-items:center; justify-content:center; color:#fff; font-weight:800; font-size:15px; flex-shrink:0;
-  }
-  .req-teacher-name { font-size:14px; font-weight:700; color:#e8eaf0; }
-  .req-teacher-code { font-family:'DM Mono',monospace; font-size:10px; color:#4a5568; }
-
-  .status-badge {
-    padding:4px 12px; border-radius:4px; font-size:11px; font-weight:700;
-    font-family:'DM Mono',monospace; letter-spacing:0.05em; flex-shrink:0;
-  }
-
-  .req-slots { display:grid; grid-template-columns:1fr 1fr; gap:10px; }
-  .slot-box { background:#0d1120; border:1px solid #1a2236; border-radius:8px; padding:12px 14px; }
-  .slot-box-label { font-family:'DM Mono',monospace; font-size:9px; color:#4a5568; letter-spacing:0.1em; text-transform:uppercase; margin-bottom:6px; }
-  .slot-row { display:flex; align-items:center; gap:6px; margin-top:4px; }
-  .slot-icon { font-size:11px; color:#4a5568; width:14px; }
-  .slot-val { font-size:12px; font-weight:600; color:#cbd5e1; font-family:'DM Mono',monospace; }
-
-  .req-course-tag { display:inline-flex; align-items:center; gap:6px; background:#00d4ff11; border:1px solid #00d4ff33; border-radius:5px; padding:4px 10px; }
-  .req-course-code { font-family:'DM Mono',monospace; font-size:11px; font-weight:700; color:#00d4ff; }
-  .req-course-name { font-size:11px; color:#64748b; }
-
-  .req-note { background:#0d1120; border:1px solid #1a2236; border-left:3px solid #f59e0b; border-radius:6px; padding:10px 14px; font-size:12px; color:#94a3b8; font-style:italic; }
-  .req-admin-note { background:#0d1120; border:1px solid #1a2236; border-left:3px solid #00d4ff; border-radius:6px; padding:10px 14px; font-size:12px; color:#94a3b8; }
-  .req-meta { font-family:'DM Mono',monospace; font-size:10px; color:#2a3a4a; }
-
-  .req-actions { display:flex; gap:8px; }
-  .btn-approve { background:#10b981; color:#fff; border:none; border-radius:6px; padding:8px 18px; font-size:12px; font-weight:700; cursor:pointer; font-family:'Syne',sans-serif; transition:all 0.15s; }
-  .btn-approve:hover { background:#059669; box-shadow:0 0 12px rgba(16,185,129,0.4); }
-  .btn-reject  { background:transparent; color:#ef4444; border:1.5px solid #ef444444; border-radius:6px; padding:8px 18px; font-size:12px; font-weight:700; cursor:pointer; font-family:'Syne',sans-serif; transition:all 0.15s; }
-  .btn-reject:hover { background:#ef444411; border-color:#ef4444; }
-
-  .empty-state { text-align:center; padding:80px 0; }
-  .empty-icon { font-size:40px; margin-bottom:12px; }
-  .empty-title { font-family:'DM Mono',monospace; font-size:13px; color:#2a3a4a; letter-spacing:0.08em; }
-
-  .stats-row { display:flex; gap:10px; margin-bottom:24px; flex-wrap:wrap; }
-  .stat-mini { background:#111827; border:1px solid #1e2a3a; border-radius:8px; padding:10px 16px; display:flex; gap:10px; align-items:center; }
-  .stat-mini-val { font-family:'DM Mono',monospace; font-size:20px; font-weight:800; }
-  .stat-mini-lbl { font-size:10px; color:#4a5568; text-transform:uppercase; letter-spacing:0.08em; }
-
-  .dark-modal .modal-lbl { display:block; font-size:11px; font-weight:700; color:#00d4ff; margin-bottom:6px; text-transform:uppercase; letter-spacing:0.08em; font-family:'DM Mono',monospace; }
-  .dark-modal .input-field { background:#111827 !important; border-color:#1e2a3a !important; color:#e8eaf0 !important; }
-  .dark-modal .input-field:focus { border-color:#00d4ff !important; }
-`;
-
-export default function ScheduleRequestsPage() {
-  const { show: toast } = useToast();
-  const [requests,    setRequests]    = useState([]);
-  const [loading,     setLoading]     = useState(true);
-  const [filter,      setFilter]      = useState('PENDING');
-  const [reviewModal, setReviewModal] = useState(null); // { req, action: 'approve'|'reject' }
-  const [adminNote,   setAdminNote]   = useState('');
-  const [submitting,  setSubmitting]  = useState(false);
-
-  const fetchRequests = useCallback(async () => {
-    setLoading(true);
+  const act = async (action) => {
+    setSaving(true)
     try {
-      const res = await api.get('/schedule-requests', { params: filter !== 'ALL' ? { status: filter } : {} });
-      setRequests(res.data.data || []);
-    } catch { toast('Хүсэлтүүд ачааллахад алдаа гарлаа', 'error'); }
-    finally { setLoading(false); }
-  }, [filter]);
-
-  useEffect(() => { fetchRequests(); }, [fetchRequests]);
-
-  const handleReview = async () => {
-    if (!reviewModal) return;
-    setSubmitting(true);
-    try {
-      const endpoint = reviewModal.action === 'approve' ? 'approve' : 'reject';
-      await api.put(`/schedule-requests/${reviewModal.req.id}/${endpoint}`, { adminNote });
-      toast(reviewModal.action === 'approve' ? 'Хүсэлт батлагдлаа!' : 'Хүсэлт татгалзагдлаа', 
-            reviewModal.action === 'approve' ? 'success' : 'info');
-      setReviewModal(null);
-      setAdminNote('');
-      fetchRequests();
-    } catch (err) {
-      toast(err.response?.data?.error || 'Алдаа гарлаа', 'error');
-    } finally { setSubmitting(false); }
-  };
-
-  const counts = {
-    PENDING:  requests.filter ? 0 : 0, // will refetch per filter
-    ALL: requests.length,
-  };
-
-  const FILTERS = [
-    { key: 'PENDING',  label: 'Хүлээгдэж байна' },
-    { key: 'APPROVED', label: 'Батлагдсан' },
-    { key: 'REJECTED', label: 'Татгалзсан' },
-    { key: 'ALL',      label: 'Бүгд' },
-  ];
+      if (action === 'approve') {
+        await api.put(`/schedule-requests/${item.id}/approve`, { adminNote })
+        // For grade requests: extract new score and apply it
+        if (isGrade) {
+          const newScoreMatch = item.note.match(/→ Шинэ: (\d+)/)
+          const newScore = newScoreMatch ? Number(newScoreMatch[1]) : null
+          const studentCodeMatch = item.note.match(/\(([A-Z]{3}\d+)\)/)
+          const studentCode = studentCodeMatch ? studentCodeMatch[1] : null
+          if (newScore !== null && studentCode) {
+            // Find student by code then update grade
+            try {
+              const sRes = await api.get(`/students?search=${studentCode}&limit=1`)
+              const student = sRes.data.data?.[0]
+              if (student) {
+                await api.post('/grades', {
+                  studentId: student.id,
+                  courseId:  item.courseId,
+                  score:     newScore,
+                  semester:  item.semester,
+                  year:      item.year,
+                })
+              }
+            } catch (e) { console.warn('Grade auto-apply failed', e) }
+          }
+        }
+        toast('Зөвшөөрлөө', 'success')
+      } else {
+        await api.put(`/schedule-requests/${item.id}/reject`, { adminNote })
+        toast('Татгалзлаа', 'info')
+      }
+      onDone()
+    } catch (err) { toast(err.response?.data?.error || 'Алдаа', 'error') }
+    finally { setSaving(false) }
+  }
 
   return (
-    <>
-      <style>{CSS}</style>
-      <div className="req-root">
-
-        <div className="req-header">
-          <div>
-            <h1>Хуваарийн хүсэлтүүд</h1>
-            <div className="subtitle">// Schedule Change Requests · Admin Review</div>
-          </div>
-          <div className="filter-tabs">
-            {FILTERS.map(f => (
-              <button key={f.key} className={`filter-tab ${filter === f.key ? 'filter-tab-on' : 'filter-tab-off'}`}
-                onClick={() => setFilter(f.key)}>{f.label}</button>
-            ))}
-          </div>
-        </div>
-
-        <div className="stats-row">
-          {[
-            { val: requests.length, lbl: filter === 'ALL' ? 'Нийт' : FILTERS.find(f=>f.key===filter)?.label, color: '#00d4ff' },
-          ].map((s, i) => (
-            <div className="stat-mini" key={i}>
-              <div>
-                <div className="stat-mini-val" style={{ color: s.color }}>{s.val}</div>
-                <div className="stat-mini-lbl">{s.lbl}</div>
-              </div>
+    <Modal title={isGrade ? 'Дүнгийн засварын хүсэлт' : 'Хуваарийн хүсэлт'} onClose={onClose}>
+      {/* Detail card */}
+      <div style={{ background:'var(--bg-page)', border:'1.5px solid var(--border)', padding:14 }}>
+        <div className="t-label" style={{ marginBottom:8 }}>ХҮСЭЛТИЙН ДЭЛГЭРЭНГҮЙ</div>
+        {isGrade ? (
+          <div style={{ display:'flex', flexDirection:'column', gap:6 }}>
+            <div style={{ display:'flex', gap:8 }}>
+              <span className="t-label" style={{ minWidth:70 }}>СУРАГЧ</span>
+              <span style={{ fontFamily:'Barlow,sans-serif', fontWeight:600, fontSize:13, color:'var(--text-main)' }}>{parsed.student}</span>
             </div>
-          ))}
-        </div>
-
-        {loading ? (
-          <div style={{ textAlign:'center', padding:'80px 0', fontFamily:'DM Mono,monospace', color:'#2a3a4a', fontSize:12, letterSpacing:'0.08em' }}>
-            <div style={{ width:28,height:28,border:'2px solid #1e2a3a',borderTopColor:'#00d4ff',borderRadius:'50%',animation:'spin 0.8s linear infinite',margin:'0 auto 12px' }} />
-            LOADING...
-          </div>
-        ) : requests.length === 0 ? (
-          <div className="empty-state">
-            <div className="empty-icon">📋</div>
-            <div className="empty-title">NO REQUESTS FOUND</div>
+            <div style={{ display:'flex', gap:8 }}>
+              <span className="t-label" style={{ minWidth:70 }}>ХИЧЭЭЛ</span>
+              <span style={{ fontFamily:'Barlow,sans-serif', fontSize:13, color:'var(--text-muted)' }}>{parsed.course}</span>
+            </div>
+            <div style={{ display:'flex', gap:8 }}>
+              <span className="t-label" style={{ minWidth:70 }}>ӨӨРЧЛӨЛТ</span>
+              <span style={{ fontFamily:'Barlow Condensed,sans-serif', fontWeight:800, fontSize:16, color:'var(--text-main)' }}>{parsed.change}</span>
+            </div>
+            {parsed.reason && (
+              <div style={{ display:'flex', gap:8 }}>
+                <span className="t-label" style={{ minWidth:70 }}>ШАЛТГААН</span>
+                <span style={{ fontFamily:'Barlow,sans-serif', fontSize:12, color:'var(--text-muted)' }}>{parsed.reason}</span>
+              </div>
+            )}
           </div>
         ) : (
-          <div className="req-list">
-            {requests.map(req => {
-              const st = STATUS_CONFIG[req.status] || STATUS_CONFIG.PENDING;
-              return (
-                <div className="req-card" key={req.id}>
-                  <div className="req-card-top">
-                    <div style={{ display:'flex', alignItems:'center', gap:12, flexWrap:'wrap' }}>
-                      <div className="req-teacher">
-                        <div className="req-avatar">{req.teacher?.firstName?.[0] || 'T'}</div>
-                        <div>
-                          <div className="req-teacher-name">{req.teacher?.firstName} {req.teacher?.lastName}</div>
-                          <div className="req-teacher-code">{req.teacher?.teacherCode}</div>
-                        </div>
-                      </div>
-                      <div className="req-course-tag">
-                        <span className="req-course-code">{req.course?.courseCode}</span>
-                        <span className="req-course-name">{req.course?.name}</span>
-                      </div>
-                    </div>
-                    <div style={{ display:'flex', alignItems:'center', gap:10 }}>
-                      <span className={`status-badge badge-${req.status.toLowerCase()}`}>{st.label}</span>
-                      <span className="req-meta">{new Date(req.createdAt).toLocaleDateString('mn-MN')}</span>
-                    </div>
-                  </div>
-
-                  <div className="req-slots">
-                    {/* Current / From */}
-                    {req.oldStartTime && (
-                      <div className="slot-box">
-                        <div className="slot-box-label">⬅ Одоогийн цаг</div>
-                        <div className="slot-row"><span className="slot-icon">📅</span><span className="slot-val">{DAYS[req.oldDayOfWeek]}</span></div>
-                        <div className="slot-row"><span className="slot-icon">⏰</span><span className="slot-val">{req.oldStartTime} – {req.oldEndTime}</span></div>
-                        {req.oldRoom && <div className="slot-row"><span className="slot-icon">🚪</span><span className="slot-val">{req.oldRoom}</span></div>}
-                      </div>
-                    )}
-                    {/* Proposed / To */}
-                    <div className="slot-box" style={{ borderColor:'#00d4ff33' }}>
-                      <div className="slot-box-label" style={{ color:'#00d4ff' }}>{req.oldStartTime ? '➡ Шинэ цаг' : '✦ Шинэ слот'}</div>
-                      <div className="slot-row"><span className="slot-icon">📅</span><span className="slot-val" style={{ color:'#00d4ff' }}>{DAYS[req.dayOfWeek]}</span></div>
-                      <div className="slot-row"><span className="slot-icon">⏰</span><span className="slot-val" style={{ color:'#00d4ff' }}>{req.startTime} – {req.endTime}</span></div>
-                      {req.room && <div className="slot-row"><span className="slot-icon">🚪</span><span className="slot-val" style={{ color:'#00d4ff' }}>{req.room}</span></div>}
-                      <div className="slot-row"><span className="slot-icon">📚</span><span className="slot-val">{req.semester} {req.year}</span></div>
-                    </div>
-                  </div>
-
-                  {req.note && (
-                    <div className="req-note">💬 {req.note}</div>
-                  )}
-                  {req.adminNote && (
-                    <div className="req-admin-note">🔷 Админ: {req.adminNote}</div>
-                  )}
-                  {req.reviewedAt && (
-                    <div className="req-meta">Шийдвэрлэсэн: {new Date(req.reviewedAt).toLocaleString('mn-MN')}</div>
-                  )}
-
-                  {req.status === 'PENDING' && (
-                    <div className="req-actions">
-                      <button className="btn-approve" onClick={() => { setReviewModal({ req, action: 'approve' }); setAdminNote(''); }}>
-                        ✓ Батлах
-                      </button>
-                      <button className="btn-reject" onClick={() => { setReviewModal({ req, action: 'reject' }); setAdminNote(''); }}>
-                        ✕ Татгалзах
-                      </button>
-                    </div>
-                  )}
-                </div>
-              );
-            })}
+          <div style={{ display:'flex', flexDirection:'column', gap:6 }}>
+            <div style={{ display:'flex', gap:8 }}>
+              <span className="t-label" style={{ minWidth:60 }}>БАГШ</span>
+              <span style={{ fontFamily:'Barlow,sans-serif', fontWeight:600, fontSize:13, color:'var(--text-main)' }}>{item.teacher?.firstName} {item.teacher?.lastName}</span>
+            </div>
+            <div style={{ display:'flex', gap:8 }}>
+              <span className="t-label" style={{ minWidth:60 }}>ХИЧЭЭЛ</span>
+              <span style={{ fontFamily:'Barlow,sans-serif', fontSize:13, color:'var(--text-muted)' }}>{item.course?.name}</span>
+            </div>
+            <div style={{ display:'flex', gap:8 }}>
+              <span className="t-label" style={{ minWidth:60 }}>ЦАГ</span>
+              <span style={{ fontFamily:'Share Tech Mono,monospace', fontSize:12, color:'var(--text-main)' }}>{DAYS[item.dayOfWeek]} · {item.startTime}–{item.endTime}{item.room ? ` · ${item.room}` : ''}</span>
+            </div>
+            {item.note && (
+              <div style={{ display:'flex', gap:8 }}>
+                <span className="t-label" style={{ minWidth:60 }}>ТАЙЛБАР</span>
+                <span style={{ fontFamily:'Barlow,sans-serif', fontSize:12, color:'var(--text-muted)' }}>{item.note}</span>
+              </div>
+            )}
           </div>
         )}
-
-        {reviewModal && (
-          <Modal
-            title={reviewModal.action === 'approve' ? 'ХҮСЭЛТ БАТЛАХ' : 'ХҮСЭЛТ ТАТГАЛЗАХ'}
-            onClose={() => setReviewModal(null)}
-            size="sm"
-          >
-            <div className="dark-modal" style={{ display:'flex', flexDirection:'column', gap:16 }}>
-              <div style={{ background:'#0d1120', border:'1px solid #1a2236', borderRadius:8, padding:'12px 14px', fontSize:13, color:'#94a3b8' }}>
-                <strong style={{ color:'#e8eaf0' }}>{reviewModal.req.teacher?.firstName} {reviewModal.req.teacher?.lastName}</strong> —{' '}
-                {reviewModal.req.course?.name} · {DAYS[reviewModal.req.dayOfWeek]} {reviewModal.req.startTime}
-              </div>
-              <div>
-                <label className="modal-lbl">Тайлбар (заавал биш)</label>
-                <textarea
-                  className="input-field"
-                  rows={3}
-                  value={adminNote}
-                  onChange={e => setAdminNote(e.target.value)}
-                  placeholder={reviewModal.action === 'approve' ? 'Батлах тайлбар...' : 'Татгалзах шалтгаан...'}
-                  style={{ resize:'vertical' }}
-                />
-              </div>
-              <div style={{ display:'flex', gap:10 }}>
-                {reviewModal.action === 'approve' ? (
-                  <button className="btn-approve" style={{ flex:1, padding:'10px' }} onClick={handleReview} disabled={submitting}>
-                    {submitting ? 'Батлаж байна...' : '✓ Батлах'}
-                  </button>
-                ) : (
-                  <button className="btn-reject" style={{ flex:1, padding:'10px' }} onClick={handleReview} disabled={submitting}>
-                    {submitting ? 'Татгалзаж байна...' : '✕ Татгалзах'}
-                  </button>
-                )}
-                <button className="btn-secondary" style={{ flex:1 }} onClick={() => setReviewModal(null)}>Болих</button>
-              </div>
-            </div>
-          </Modal>
-        )}
       </div>
-    </>
-  );
+
+      <div>
+        <label className="form-label">Админы тайлбар (заавал биш)</label>
+        <textarea className="input" rows={3} style={{ resize:'none' }} value={adminNote} onChange={e => setAdminNote(e.target.value)} placeholder="Тайлбар..." />
+      </div>
+
+      <div style={{ display:'flex', gap:10, paddingTop:4 }}>
+        <button className="btn btn-success" style={{ flex:1 }} disabled={saving} onClick={() => act('approve')}>
+          {saving ? <Spinner /> : 'ЗӨВШӨӨРӨХ'}
+        </button>
+        <button className="btn btn-danger" style={{ flex:1 }} disabled={saving} onClick={() => act('reject')}>
+          {saving ? <Spinner /> : 'ТАТГАЛЗАХ'}
+        </button>
+        <button className="btn btn-ghost" style={{ flex:1 }} onClick={onClose}>БОЛИХ</button>
+      </div>
+    </Modal>
+  )
+}
+
+export default function ScheduleRequestsPage() {
+  const { show: toast } = useToast()
+  const [rows, setRows]         = useState([])
+  const [loading, setLoading]   = useState(true)
+  const [selected, setSelected] = useState(null)
+  const [tab, setTab]           = useState('all') // all | schedule | grade
+
+  const load = useCallback(async () => {
+    setLoading(true)
+    try { const r = await api.get('/schedule-requests'); setRows(r.data.data || []) }
+    catch { toast('Ачааллахад алдаа', 'error') }
+    finally { setLoading(false) }
+  }, [])
+
+  useEffect(() => { load() }, [load])
+
+  const filtered = rows.filter(r => {
+    if (tab === 'schedule') return !isGradeReq(r)
+    if (tab === 'grade')    return isGradeReq(r)
+    return true
+  })
+
+  const pending       = rows.filter(r => r.status === 'PENDING').length
+  const pendingGrade  = rows.filter(r => r.status === 'PENDING' && isGradeReq(r)).length
+  const pendingSched  = rows.filter(r => r.status === 'PENDING' && !isGradeReq(r)).length
+
+  return (
+    <div className="page">
+      <PageHeader eyebrow="ХЯНАЛТ" titleMain="ХҮСЭЛТ" titleDim={pending > 0 ? `ҮҮД (${pending})` : 'ҮҮД'}
+        meta={`${rows.length} нийт · ${pending} хүлээгдэж буй`} />
+
+      {/* Summary cards */}
+      <div style={{ display:'grid', gridTemplateColumns:'repeat(3,1fr)', gap:12, marginBottom:16 }}>
+        {[
+          { label:'НИЙТ ХҮСЭЛТ',   val:rows.length,   dark:true },
+          { label:'ХУВААРИЙН',     val:rows.filter(r => !isGradeReq(r)).length },
+          { label:'ДҮНГИЙН ЗАСВАР', val:rows.filter(r => isGradeReq(r)).length },
+        ].map((s,i) => (
+          <div key={i} className={s.dark?'card-navy':'card'} style={{ padding:'14px 18px', display:'flex', alignItems:'center', justifyContent:'space-between' }}>
+            <div className="t-label" style={{ color: s.dark?'rgba(245,240,232,0.35)':'var(--muted)' }}>{s.label}</div>
+            <div style={{ fontFamily:'Barlow Condensed,sans-serif', fontWeight:900, fontSize:38, color: s.dark?'var(--beige)':'var(--navy)' }}>{s.val}</div>
+          </div>
+        ))}
+      </div>
+
+      {/* Tab filter */}
+      <div style={{ display:'flex', border:'1.5px solid var(--border)', overflow:'hidden', marginBottom:14, width:'fit-content' }}>
+        {[
+          ['all',      `БҮГД (${rows.length})`],
+          ['schedule', `ХУВААРЬ${pendingSched > 0 ? ` · ${pendingSched} хүлээгдэж буй` : ''}`],
+          ['grade',    `ДҮНГИЙН ЗАСВАР${pendingGrade > 0 ? ` · ${pendingGrade} хүлээгдэж буй` : ''}`],
+        ].map(([v,label]) => (
+          <button key={v} onClick={() => setTab(v)} style={{ padding:'8px 18px', fontFamily:'Barlow Condensed,sans-serif', fontWeight:800, fontSize:11, letterSpacing:'0.08em', textTransform:'uppercase', background:tab===v?'var(--navy)':'transparent', color:tab===v?'var(--beige)':'var(--muted)', border:'none', cursor:'pointer', transition:'all 0.12s', whiteSpace:'nowrap' }}>{label}</button>
+        ))}
+      </div>
+
+      {/* Table */}
+      {loading ? <SkeletonTable rows={6} cols={6} /> : filtered.length === 0 ? <Empty text="ХҮСЭЛТ БАЙХГҮЙ" /> : (
+        <div className="anim-fade" style={{ background:'var(--bg-card)', border:'1.5px solid var(--border-light)', overflowX:'auto' }}>
+          <table className="tbl">
+            <thead>
+              <tr>{['ТӨРӨЛ','БАГШ','ДЭЛГЭРЭНГҮЙ','УЛИРАЛ','СТАТУС','ОГНОО','ҮЙЛДЭЛ'].map(h => <th key={h}>{h}</th>)}</tr>
+            </thead>
+            <tbody>
+              {filtered.map(r => {
+                const s = S_CLS[r.status] || S_CLS.PENDING
+                const grade = isGradeReq(r)
+                const parsed = grade ? parseGradeNote(r.note) : null
+                return (
+                  <tr key={r.id}>
+                    <td>
+                      {grade
+                        ? <span className="badge badge-amber" style={{ fontSize:9 }}>ДҮН</span>
+                        : <span className="badge badge-navy"  style={{ fontSize:9 }}>ХУВААРЬ</span>}
+                    </td>
+                    <td style={{ fontWeight:600 }}>{r.teacher?.firstName} {r.teacher?.lastName}</td>
+                    <td style={{ maxWidth:260 }}>
+                      {grade ? (
+                        <div>
+                          <div style={{ fontFamily:'Barlow,sans-serif', fontSize:12, fontWeight:600, color:'var(--text-main)' }}>{parsed?.student}</div>
+                          <div style={{ fontFamily:'Share Tech Mono,monospace', fontSize:10, color:'var(--text-muted)' }}>{parsed?.change}</div>
+                        </div>
+                      ) : (
+                        <div>
+                          <div style={{ fontFamily:'Barlow,sans-serif', fontSize:12, fontWeight:600, color:'var(--text-main)' }}>{r.course?.name}</div>
+                          {/* Show old → new diff if old values exist */}
+                          {r.oldStartTime ? (
+                            <div style={{ display:'flex', flexDirection:'column', gap:2, marginTop:3 }}>
+                              <div style={{ fontFamily:'Share Tech Mono,monospace', fontSize:9, color:'var(--red)', textDecoration:'line-through' }}>
+                                {DAYS[r.oldDayOfWeek ?? r.dayOfWeek]} · {r.oldStartTime}–{r.oldEndTime}{r.oldRoom ? ` · ${r.oldRoom}` : ''}
+                              </div>
+                              <div style={{ fontFamily:'Share Tech Mono,monospace', fontSize:9, color:'var(--green)' }}>
+                                {DAYS[r.dayOfWeek]} · {r.startTime}–{r.endTime}{r.room ? ` · ${r.room}` : ''}
+                              </div>
+                            </div>
+                          ) : (
+                            <div style={{ fontFamily:'Share Tech Mono,monospace', fontSize:10, color:'var(--text-muted)' }}>{DAYS[r.dayOfWeek]} · {r.startTime}–{r.endTime}{r.room ? ` · ${r.room}` : ''}</div>
+                          )}
+                          {r.note && !isGradeReq(r) && (
+                            <div style={{ fontFamily:'Barlow,sans-serif', fontSize:11, color:'var(--text-muted)', marginTop:3, fontStyle:'italic' }}>"{r.note}"</div>
+                          )}
+                        </div>
+                      )}
+                    </td>
+                    <td><span className="badge badge-beige" style={{ fontSize:9 }}>{r.semester} {r.year}</span></td>
+                    <td><span className={`badge ${s.cls}`} style={{ fontSize:9 }}>{s.label}</span></td>
+                    <td style={{ fontFamily:'Share Tech Mono,monospace', fontSize:10, color:'var(--text-faint)', whiteSpace:'nowrap' }}>
+                      {new Date(r.createdAt).toLocaleDateString()}
+                    </td>
+                    <td>
+                      {r.status === 'PENDING' ? (
+                        <ActBtn label="ШИЙДВЭРЛЭХ" onClick={() => setSelected(r)} />
+                      ) : (
+                        <span className="t-label">{r.adminNote ? `"${r.adminNote.slice(0,30)}..."` : '—'}</span>
+                      )}
+                    </td>
+                  </tr>
+                )
+              })}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      {selected && (
+        <ApproveModal
+          item={selected}
+          onClose={() => setSelected(null)}
+          onDone={() => { setSelected(null); load() }}
+        />
+      )}
+    </div>
+  )
 }

@@ -1,47 +1,34 @@
-export function SkeletonRow({ cols = 5 }) {
-  return (
-    <tr>
+export const SkeletonCard = () => (
+  <div style={{ border:'1.5px solid #d0d7ed', padding:'20px', background:'#ffffff' }}>
+    <div className="skeleton" style={{ height:9, width:'45%', marginBottom:12 }}/>
+    <div className="skeleton" style={{ height:40, width:'65%', marginBottom:10 }}/>
+    <div className="skeleton" style={{ height:2, width:'36%' }}/>
+  </div>
+);
+
+export const SkeletonRow = () => (
+  <div style={{ display:'flex', alignItems:'center', gap:12, padding:'12px 0', borderBottom:'1px solid #e8ecf7' }}>
+    <div className="skeleton" style={{ height:13, flex:1 }}/>
+    <div className="skeleton" style={{ height:13, width:80 }}/>
+    <div className="skeleton" style={{ height:13, width:60 }}/>
+  </div>
+);
+
+export const SkeletonTable = ({ rows = 6, cols = 4 }) => (
+  <div style={{ background:'#ffffff', border:'1.5px solid #d0d7ed' }}>
+    {/* Header */}
+    <div style={{ display:'flex', gap:16, padding:'11px 16px', borderBottom:'2px solid #0d1b3e', background:'#f4f6fb' }}>
       {Array.from({ length: cols }).map((_, i) => (
-        <td key={i} className="px-4 py-3">
-          <div className="skeleton h-4 rounded" style={{ width: `${60 + Math.random() * 30}%` }} />
-        </td>
+        <div key={i} className="skeleton" style={{ height:10, flex: i === 0 ? 2 : 1, opacity:0.5 }}/>
       ))}
-    </tr>
-  );
-}
-
-export function SkeletonCard() {
-  return (
-    <div className="card space-y-3 animate-pulse">
-      <div className="skeleton h-4 w-1/3 rounded" />
-      <div className="skeleton h-6 w-2/3 rounded" />
-      <div className="skeleton h-3 w-full rounded" />
-      <div className="skeleton h-3 w-4/5 rounded" />
     </div>
-  );
-}
-
-export function SkeletonTable({ rows = 5, cols = 5 }) {
-  return (
-    <div className="card p-0 overflow-hidden">
-      <div className="overflow-x-auto">
-        <table className="w-full text-sm">
-          <thead className="bg-slate-50 border-b border-slate-200">
-            <tr>
-              {Array.from({ length: cols }).map((_, i) => (
-                <th key={i} className="px-4 py-3">
-                  <div className="skeleton h-3 rounded w-20" />
-                </th>
-              ))}
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-slate-100">
-            {Array.from({ length: rows }).map((_, i) => (
-              <SkeletonRow key={i} cols={cols} />
-            ))}
-          </tbody>
-        </table>
+    {/* Rows */}
+    {Array.from({ length: rows }).map((_, r) => (
+      <div key={r} style={{ display:'flex', gap:16, padding:'12px 16px', borderBottom:'1px solid #e8ecf7', alignItems:'center' }}>
+        {Array.from({ length: cols }).map((_, c) => (
+          <div key={c} className="skeleton" style={{ height:11, flex: c === 0 ? 2 : 1 }}/>
+        ))}
       </div>
-    </div>
-  );
-}
+    ))}
+  </div>
+);

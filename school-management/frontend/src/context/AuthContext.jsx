@@ -1,44 +1,39 @@
-import { createContext, useContext, useState, useEffect } from 'react';
-import api from '../api/axios';
+import { createContext, useContext, useState, useEffect } from 'react'
+import api from '../api/axios'
 
-const AuthContext = createContext(null);
+const Ctx = createContext(null)
 
-export const AuthProvider = ({ children }) => {
-  const [user, setUser] = useState(null);
-  const [loading, setLoading] = useState(true);
+export function AuthProvider({ children }) {
+  const [user, setUser]       = useState(null)
+  const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    const token = localStorage.getItem('token');
-    const savedUser = localStorage.getItem('user');
-    if (token && savedUser) {
-      setUser(JSON.parse(savedUser));
-      api.defaults.headers.common['Authorization'] = `Bearer ${token}`;
-    }
-    setLoading(false);
-  }, []);
+    const token = localStorage.getItem('token')
+    if (!token) { setLoading(false); return }
+    api.get('/auth/me')
+      .then(r => setUser(r.data))
+      .catch(() => localStorage.removeItem('token'))
+      .finally(() => setLoading(false))
+  }, [])
 
   const login = async (email, password) => {
-    const res = await api.post('/auth/login', { email, password });
-    const { token, user } = res.data;
-    localStorage.setItem('token', token);
-    localStorage.setItem('user', JSON.stringify(user));
-    api.defaults.headers.common['Authorization'] = `Bearer ${token}`;
-    setUser(user);
-    return user;
-  };
+    const r = await api.post('/auth/login', { email, password })
+    localStorage.setItem('token', r.data.token)
+    setUser(r.data.user)
+    return r.data
+  }
 
-  const logout = () => {
-    localStorage.removeItem('token');
-    localStorage.removeItem('user');
-    delete api.defaults.headers.common['Authorization'];
-    setUser(null);
-  };
+  const logout = () => { localStorage.removeItem('token'); setUser(null) }
+
+  const isAdmin   = user?.role === 'ADMIN'
+  const isTeacher = user?.role === 'TEACHER'
+  const isStudent = user?.role === 'STUDENT'
 
   return (
-    <AuthContext.Provider value={{ user, login, logout, loading, isAdmin: user?.role === 'ADMIN', isTeacher: user?.role === 'TEACHER', isStudent: user?.role === 'STUDENT' }}>
+    <Ctx.Provider value={{ user, loading, login, logout, isAdmin, isTeacher, isStudent }}>
       {children}
-    </AuthContext.Provider>
-  );
-};
+    </Ctx.Provider>
+  )
+}
 
-export const useAuth = () => useContext(AuthContext);
+export const useAuth = () => useContext(Ctx)
