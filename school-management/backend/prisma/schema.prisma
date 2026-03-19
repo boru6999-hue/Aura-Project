@@ -1,0 +1,178 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  ADMIN
+  TEACHER
+  STUDENT
+}
+
+model User {
+  id        Int      @id @default(autoincrement())
+  email     String   @unique
+  password  String
+  role      Role     @default(STUDENT)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @default(now()) @updatedAt
+  student   Student?
+  teacher   Teacher?
+}
+
+model Student {
+  id           Int          @id @default(autoincrement())
+  studentCode  String       @unique
+  firstName    String
+  lastName     String
+  dateOfBirth  DateTime?
+  phone        String?
+  address      String?
+  userId       Int          @unique
+  user         User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  grades       Grade[]
+  attendances  Attendance[]
+  enrollments  Enrollment[]
+  createdAt    DateTime     @default(now())
+  updatedAt    DateTime     @updatedAt
+
+  @@index([firstName, lastName])
+  @@index([studentCode])
+}
+
+model Teacher {
+  id          Int        @id @default(autoincrement())
+  teacherCode String     @unique
+  firstName   String
+  lastName    String
+  department  String?
+  phone       String?
+  userId      Int        @unique
+  user        User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  courses     Course[]
+  schedules   Schedule[]
+  scheduleRequests ScheduleRequest[]
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+}
+
+model Course {
+  id          Int        @id @default(autoincrement())
+  courseCode  String     @unique
+  name        String
+  description String?    @db.Text
+  credits     Int        @default(3)
+  teacherId   Int?
+  teacher     Teacher?   @relation(fields: [teacherId], references: [id])
+  grades      Grade[]
+  attendances Attendance[]
+  enrollments Enrollment[]
+  schedules   Schedule[]
+  scheduleRequests ScheduleRequest[]
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+
+  @@index([courseCode])
+  @@index([name])
+}
+
+model Schedule {
+  id        Int      @id @default(autoincrement())
+  courseId  Int
+  teacherId Int?
+  dayOfWeek Int      // 0=Даваа 1=Мягмар 2=Лхагва 3=Пүрэв 4=Баасан
+  startTime String   // "08:00"
+  endTime   String   // "09:40"
+  room      String?
+  semester  String
+  year      Int
+  course    Course   @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  teacher   Teacher? @relation(fields: [teacherId], references: [id])
+  requests  ScheduleRequest[]
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([courseId, dayOfWeek, startTime, semester, year])
+  @@index([semester, year])
+  @@index([courseId])
+}
+
+model Grade {
+  id        Int      @id @default(autoincrement())
+  score     Float
+  grade     String
+  semester  String
+  year      Int
+  studentId Int
+  courseId  Int
+  student   Student  @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  course    Course   @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([studentId, courseId, semester, year])
+}
+
+model Attendance {
+  id        Int      @id @default(autoincrement())
+  date      DateTime @default(now())
+  status    String   @default("PRESENT")
+  studentId Int
+  courseId  Int
+  student   Student  @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  course    Course   @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+
+  @@index([studentId, courseId])
+  @@index([date])
+}
+
+model Enrollment {
+  id        Int      @id @default(autoincrement())
+  semester  String
+  year      Int
+  studentId Int
+  courseId  Int
+  student   Student  @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  course    Course   @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+
+  @@unique([studentId, courseId, semester, year])
+}
+
+model ScheduleRequest {
+  id            Int      @id @default(autoincrement())
+  scheduleId    Int?     // null = new slot request, set = change existing
+  teacherId     Int
+  courseId      Int
+  // Proposed new values
+  dayOfWeek     Int
+  startTime     String
+  endTime       String
+  room          String?
+  semester      String
+  year          Int
+  // Current values (for change requests, null for new)
+  oldDayOfWeek  Int?
+  oldStartTime  String?
+  oldEndTime    String?
+  oldRoom       String?
+  // Status
+  status        String   @default("PENDING") // PENDING | APPROVED | REJECTED
+  note          String?  @db.Text
+  adminNote     String?  @db.Text
+  reviewedAt    DateTime?
+  // Relations
+  schedule      Schedule?  @relation(fields: [scheduleId], references: [id], onDelete: SetNull)
+  teacher       Teacher    @relation(fields: [teacherId], references: [id], onDelete: Cascade)
+  course        Course     @relation(fields: [courseId],  references: [id], onDelete: Cascade)
+  createdAt     DateTime   @default(now())
+  updatedAt     DateTime   @default(now()) @updatedAt
+
+  @@index([status])
+  @@index([teacherId])
+}

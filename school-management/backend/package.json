@@ -1,0 +1,34 @@
+{
+  "name": "school-management-backend",
+  "version": "1.0.0",
+  "description": "School Management System Backend",
+  "main": "src/index.js",
+  "scripts": {
+    "dev":              "nodemon src/index.js",
+    "start":            "node src/index.js",
+    "prisma:generate":  "prisma generate",
+    "prisma:migrate":   "prisma migrate dev",
+    "prisma:seed":      "node src/prisma/seed.js",
+    "prisma:reset":     "prisma migrate reset --force",
+    "seed:fresh":       "prisma migrate reset --force && node src/prisma/seed.js",
+    "setup":            "prisma generate && prisma migrate dev --name init && node src/prisma/seed.js"
+  },
+  "dependencies": {
+    "@prisma/client": "^5.7.0",
+    "bcryptjs": "^2.4.3",
+    "cors": "^2.8.5",
+    "dotenv": "^16.3.1",
+    "express": "^4.18.2",
+    "express-graphql": "^0.12.0",
+    "graphql": "^15.8.0",
+    "jsonwebtoken": "^9.0.2",
+    "node-cache": "^5.1.2"
+  },
+  "devDependencies": {
+    "nodemon": "^3.0.2",
+    "prisma": "^5.7.0"
+  },
+  "prisma": {
+    "seed": "node src/prisma/seed.js"
+  }
+}
