@@ -2,8 +2,8 @@ export function SkeletonRow({ cols = 5 }) {
   return (
     <tr>
       {Array.from({ length: cols }).map((_, i) => (
-        <td key={i} className="px-4 py-3">
-          <div className="skeleton h-4 rounded" style={{ width: `${60 + Math.random() * 30}%` }} />
+        <td key={i} style={{ padding:'12px 14px' }}>
+          <div className="skeleton" style={{ height:14, width:`${55 + Math.random()*35}%`, borderRadius:6 }} />
         </td>
       ))}
     </tr>
@@ -12,33 +12,30 @@ export function SkeletonRow({ cols = 5 }) {
 
 export function SkeletonCard() {
   return (
-    <div className="card space-y-3 animate-pulse">
-      <div className="skeleton h-4 w-1/3 rounded" />
-      <div className="skeleton h-6 w-2/3 rounded" />
-      <div className="skeleton h-3 w-full rounded" />
-      <div className="skeleton h-3 w-4/5 rounded" />
+    <div style={{ background:'#141c2e', border:'1px solid rgba(255,255,255,0.06)', borderRadius:16, padding:'18px 20px' }}>
+      <div className="skeleton" style={{ height:12, width:'40%', marginBottom:12 }} />
+      <div className="skeleton" style={{ height:28, width:'60%', marginBottom:10 }} />
+      <div className="skeleton" style={{ height:10, width:'80%' }} />
     </div>
   );
 }
 
 export function SkeletonTable({ rows = 5, cols = 5 }) {
   return (
-    <div className="card p-0 overflow-hidden">
-      <div className="overflow-x-auto">
-        <table className="w-full text-sm">
-          <thead className="bg-slate-50 border-b border-slate-200">
+    <div style={{ background:'#141c2e', border:'1px solid rgba(255,255,255,0.06)', borderRadius:20, overflow:'hidden' }}>
+      <div style={{ overflowX:'auto' }}>
+        <table style={{ width:'100%', borderCollapse:'collapse' }}>
+          <thead>
             <tr>
               {Array.from({ length: cols }).map((_, i) => (
-                <th key={i} className="px-4 py-3">
-                  <div className="skeleton h-3 rounded w-20" />
+                <th key={i} style={{ padding:'10px 14px', background:'#1a2338', borderBottom:'1px solid rgba(255,255,255,0.06)' }}>
+                  <div className="skeleton" style={{ height:10, width:60, borderRadius:4 }} />
                 </th>
               ))}
             </tr>
           </thead>
-          <tbody className="divide-y divide-slate-100">
-            {Array.from({ length: rows }).map((_, i) => (
-              <SkeletonRow key={i} cols={cols} />
-            ))}
+          <tbody>
+            {Array.from({ length: rows }).map((_, i) => <SkeletonRow key={i} cols={cols} />)}
           </tbody>
         </table>
       </div>

@@ -54,11 +54,11 @@ export default function CoursesPage() {
   const creditColor = (n) => n >= 4 ? 'bg-rose-100 text-rose-700' : n === 3 ? 'bg-indigo-100 text-indigo-700' : 'bg-slate-100 text-slate-600';
 
   return (
-    <div className="p-6 space-y-5 animate-fade-in">
+    <div className="animate-fade-in" style={{ padding:"28px", minHeight:"100vh", background:"#0a0e1a" }}>
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-slate-900">Хичээлүүд</h1>
-          <p className="text-sm text-slate-500 mt-0.5 flex items-center gap-2">
+          <h1 className="text-2xl font-bold">Хичээлүүд</h1>
+          <p className="text-sm text-[rgba(255,255,255,0.35)] mt-0.5 flex items-center gap-2">
             {meta.total||0} нийт хичээл
             {cached && <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs bg-amber-100 text-amber-700 font-semibold">⚡ Кэшлэгдсэн</span>}
           </p>
@@ -79,7 +79,7 @@ export default function CoursesPage() {
       ) : courses.length === 0 ? (
         <div className="card text-center py-16 animate-scale-in">
           <span className="text-5xl">📚</span>
-          <p className="text-slate-400 mt-3 font-medium">Хичээл олдсонгүй</p>
+          <p className="text-[rgba(255,255,255,0.25)] mt-3 font-medium">Хичээл олдсонгүй</p>
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4 stagger">
@@ -91,9 +91,9 @@ export default function CoursesPage() {
                 <span className="font-mono text-xs text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded-lg font-semibold">{c.courseCode}</span>
                 <span className={`text-xs font-bold px-2.5 py-0.5 rounded-full ${creditColor(c.credits)}`}>{c.credits} кредит</span>
               </div>
-              <h3 className="font-bold text-slate-900 mb-1 group-hover:text-indigo-700 transition-colors">{c.name}</h3>
-              {c.description && <p className="text-xs text-slate-400 mb-3 line-clamp-2">{c.description}</p>}
-              <div className="space-y-1 text-xs text-slate-500 mb-4">
+              <h3 className="font-bold text-[#e8eaf0] mb-1 group-hover:text-indigo-700 transition-colors">{c.name}</h3>
+              {c.description && <p className="text-xs text-[rgba(255,255,255,0.25)] mb-3 line-clamp-2">{c.description}</p>}
+              <div className="space-y-1 text-xs text-[rgba(255,255,255,0.35)] mb-4">
                 <div className="flex items-center gap-1.5">
                   <span>👩‍🏫</span>
                   <span>{c.teacher ? `${c.teacher.firstName} ${c.teacher.lastName}` : 'Багш оноогдоогүй'}</span>
@@ -104,7 +104,7 @@ export default function CoursesPage() {
                 </div>
               </div>
               {(isAdmin||isTeacher) && (
-                <div className="flex gap-2 pt-3 border-t border-slate-100">
+                <div className="flex gap-2 pt-3 border-t border-[rgba(255,255,255,0.05)]">
                   <button onClick={()=>openEdit(c)} className="text-xs text-indigo-600 hover:text-indigo-800 font-semibold px-2.5 py-1.5 rounded-lg hover:bg-indigo-50 transition-all flex-1 text-center">Засах</button>
                   {isAdmin && <button onClick={()=>handleDelete(c.id, c.name)} className="text-xs text-red-500 hover:text-red-700 font-semibold px-2.5 py-1.5 rounded-lg hover:bg-red-50 transition-all flex-1 text-center">Устгах</button>}
                 </div>
@@ -116,7 +116,7 @@ export default function CoursesPage() {
 
       {meta.totalPages > 1 && (
         <div className="flex items-center justify-between animate-fade-in">
-          <p className="text-sm text-slate-500">{meta.page}/{meta.totalPages} хуудас</p>
+          <p className="text-sm text-[rgba(255,255,255,0.35)]">{meta.page}/{meta.totalPages} хуудас</p>
           <div className="flex gap-2">
             <button disabled={page<=1} onClick={()=>setPage(p=>p-1)} className="btn-secondary text-sm py-1.5 disabled:opacity-40">← Өмнөх</button>
             <button disabled={page>=meta.totalPages} onClick={()=>setPage(p=>p+1)} className="btn-secondary text-sm py-1.5 disabled:opacity-40">Дараах →</button>
@@ -127,11 +127,11 @@ export default function CoursesPage() {
       {showModal && (
         <Modal title={editId ? 'Хичээл засах' : 'Хичээл нэмэх'} onClose={()=>setShowModal(false)}>
           <form onSubmit={handleSubmit} className="space-y-4">
-            <div><label className="block text-sm font-semibold text-slate-700 mb-1.5">Хичээлийн нэр *</label><input className="input-field" value={form.name} onChange={e=>setForm({...form,name:e.target.value})} required /></div>
-            <div><label className="block text-sm font-semibold text-slate-700 mb-1.5">Тайлбар</label><textarea className="input-field resize-none" rows={3} value={form.description} onChange={e=>setForm({...form,description:e.target.value})} /></div>
-            <div><label className="block text-sm font-semibold text-slate-700 mb-1.5">Кредит</label><input type="number" min="1" max="10" className="input-field" value={form.credits} onChange={e=>setForm({...form,credits:e.target.value})} /></div>
+            <div><label className="block text-sm font-semibold text-[rgba(255,255,255,0.7)] mb-1.5">Хичээлийн нэр *</label><input className="input-field" value={form.name} onChange={e=>setForm({...form,name:e.target.value})} required /></div>
+            <div><label className="block text-sm font-semibold text-[rgba(255,255,255,0.7)] mb-1.5">Тайлбар</label><textarea className="input-field resize-none" rows={3} value={form.description} onChange={e=>setForm({...form,description:e.target.value})} /></div>
+            <div><label className="block text-sm font-semibold text-[rgba(255,255,255,0.7)] mb-1.5">Кредит</label><input type="number" min="1" max="10" className="input-field" value={form.credits} onChange={e=>setForm({...form,credits:e.target.value})} /></div>
             <div>
-              <label className="block text-sm font-semibold text-slate-700 mb-1.5">Багш</label>
+              <label className="block text-sm font-semibold text-[rgba(255,255,255,0.7)] mb-1.5">Багш</label>
               <select className="input-field" value={form.teacherId} onChange={e=>setForm({...form,teacherId:e.target.value})}>
                 <option value="">Багш оноогдоогүй</option>
                 {teachers.map(t=><option key={t.id} value={t.id}>{t.firstName} {t.lastName}</option>)}

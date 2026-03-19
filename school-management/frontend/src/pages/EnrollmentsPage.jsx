@@ -124,12 +124,12 @@ export default function EnrollmentsPage() {
   };
 
   return (
-    <div className="p-6 space-y-6">
+    <div style={{ padding:"28px", minHeight:"100vh", background:"#0a0e1a" }}>
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-slate-900">Хичээлийн бүртгэл</h1>
-          <p className="text-sm text-slate-500 mt-0.5">Сурагчдыг хичээлд хуваарилах</p>
+          <h1 className="text-2xl font-bold">Хичээлийн бүртгэл</h1>
+          <p className="text-sm text-[rgba(255,255,255,0.35)] mt-0.5">Сурагчдыг хичээлд хуваарилах</p>
         </div>
         {(isAdmin || isTeacher) && (
           <button onClick={openAssign} className="btn-primary flex items-center gap-2">
@@ -155,7 +155,7 @@ export default function EnrollmentsPage() {
       </div>
 
       {/* Filters */}
-      <div className="bg-white border border-slate-200 rounded-2xl p-4">
+      <div className="bg-[#141c2e] border border-[rgba(255,255,255,0.08)] rounded-2xl p-4">
         <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
           <select className="input-field text-sm" value={filterCourse} onChange={e => setFilterCourse(e.target.value)}>
             <option value="">Бүх хичээл</option>
@@ -184,48 +184,48 @@ export default function EnrollmentsPage() {
       {loading ? (
         <SkeletonTable rows={6} cols={5} />
       ) : enrollments.length === 0 ? (
-        <div className="bg-white border border-slate-200 rounded-2xl flex flex-col items-center justify-center py-20">
+        <div className="bg-[#141c2e] border border-[rgba(255,255,255,0.08)] rounded-2xl flex flex-col items-center justify-center py-20">
           <span className="text-5xl mb-4">📋</span>
-          <p className="text-slate-500 font-medium">Бүртгэл олдсонгүй</p>
+          <p className="text-[rgba(255,255,255,0.35)] font-medium">Бүртгэл олдсонгүй</p>
           {(isAdmin || isTeacher) && (
             <button onClick={openAssign} className="mt-4 btn-primary text-sm">＋ Анхны бүртгэл нэмэх</button>
           )}
         </div>
       ) : (
-        <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden">
+        <div className="bg-[#141c2e] border border-[rgba(255,255,255,0.08)] rounded-2xl overflow-hidden">
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
-              <thead className="bg-slate-50 border-b border-slate-200">
+              <thead className="bg-[#0a0e1a] border-b border-[rgba(255,255,255,0.08)]">
                 <tr>
                   {['Сурагч', 'Код', 'Хичээл', 'Улирал', 'Он', 'Үйлдэл'].map(h => (
-                    <th key={h} className="px-4 py-3 text-left text-xs font-bold text-slate-500 uppercase tracking-wider">{h}</th>
+                    <th key={h} className="px-4 py-3 text-left text-xs font-bold text-[rgba(255,255,255,0.35)] uppercase tracking-wider">{h}</th>
                   ))}
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
                 {enrollments.map((e, i) => (
-                  <tr key={e.id} className="hover:bg-slate-50 transition-colors">
+                  <tr key={e.id} className="hover:bg-[#0a0e1a] transition-colors">
                     <td className="px-4 py-3">
                       <div className="flex items-center gap-2">
                         <div className="w-7 h-7 rounded-full bg-indigo-100 flex items-center justify-center text-indigo-700 text-xs font-bold flex-shrink-0">
                           {e.student?.firstName?.[0]}{e.student?.lastName?.[0]}
                         </div>
-                        <span className="font-medium text-slate-900">{e.student?.firstName} {e.student?.lastName}</span>
+                        <span className="font-medium text-[#e8eaf0]">{e.student?.firstName} {e.student?.lastName}</span>
                       </div>
                     </td>
                     <td className="px-4 py-3">
                       <span className="font-mono text-xs bg-slate-100 text-slate-600 px-2 py-0.5 rounded-lg">{e.student?.studentCode}</span>
                     </td>
                     <td className="px-4 py-3">
-                      <span className="font-medium text-slate-700">{e.course?.name}</span>
-                      <span className="ml-2 font-mono text-xs text-slate-400">{e.course?.courseCode}</span>
+                      <span className="font-medium text-[rgba(255,255,255,0.7)]">{e.course?.name}</span>
+                      <span className="ml-2 font-mono text-xs text-[rgba(255,255,255,0.25)]">{e.course?.courseCode}</span>
                     </td>
                     <td className="px-4 py-3">
                       <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-blue-100 text-blue-800">
                         {e.semester}
                       </span>
                     </td>
-                    <td className="px-4 py-3 text-slate-500 font-medium">{e.year}</td>
+                    <td className="px-4 py-3 text-[rgba(255,255,255,0.35)] font-medium">{e.year}</td>
                     <td className="px-4 py-3">
                       {(isAdmin || isTeacher) && (
                         <button
@@ -249,14 +249,14 @@ export default function EnrollmentsPage() {
         <Modal title="Хичээлд бүртгэх" onClose={() => setShowAssign(false)} size="lg">
           <form onSubmit={handleAssign} className="space-y-5">
             {/* Mode toggle */}
-            <div className="flex rounded-xl border border-slate-200 overflow-hidden">
+            <div className="flex rounded-xl border border-[rgba(255,255,255,0.08)] overflow-hidden">
               {[['single', '👤 Нэг сурагч'], ['bulk', '👥 Олон сурагч']].map(([mode, label]) => (
                 <button key={mode} type="button"
                   onClick={() => setAssignForm(f => ({ ...f, mode, studentId: '', selectedStudentIds: [] }))}
                   className={`flex-1 py-2.5 text-sm font-semibold transition-all duration-200 ${
                     assignForm.mode === mode
                       ? 'bg-indigo-600 text-white'
-                      : 'bg-white text-slate-600 hover:bg-slate-50'
+                      : 'bg-[#141c2e] text-slate-600 hover:bg-[#0a0e1a]'
                   }`}
                 >
                   {label}
@@ -266,7 +266,7 @@ export default function EnrollmentsPage() {
 
             {/* Course */}
             <div>
-              <label className="block text-sm font-semibold text-slate-700 mb-1.5">Хичээл *</label>
+              <label className="block text-sm font-semibold text-[rgba(255,255,255,0.7)] mb-1.5">Хичээл *</label>
               <select className="input-field" value={assignForm.courseId}
                 onChange={e => setAssignForm(f => ({ ...f, courseId: e.target.value }))} required>
                 <option value="">Хичээл сонгоно уу</option>
@@ -279,7 +279,7 @@ export default function EnrollmentsPage() {
             {/* Single student */}
             {assignForm.mode === 'single' && (
               <div>
-                <label className="block text-sm font-semibold text-slate-700 mb-1.5">Сурагч *</label>
+                <label className="block text-sm font-semibold text-[rgba(255,255,255,0.7)] mb-1.5">Сурагч *</label>
                 <select className="input-field" value={assignForm.studentId}
                   onChange={e => setAssignForm(f => ({ ...f, studentId: e.target.value }))} required>
                   <option value="">Сурагч сонгоно уу</option>
@@ -294,7 +294,7 @@ export default function EnrollmentsPage() {
             {assignForm.mode === 'bulk' && (
               <div>
                 <div className="flex items-center justify-between mb-1.5">
-                  <label className="block text-sm font-semibold text-slate-700">
+                  <label className="block text-sm font-semibold text-[rgba(255,255,255,0.7)]">
                     Сурагчид *
                     {assignForm.selectedStudentIds.length > 0 && (
                       <span className="ml-2 text-xs font-bold text-indigo-600 bg-indigo-100 px-2 py-0.5 rounded-full">
@@ -311,7 +311,7 @@ export default function EnrollmentsPage() {
                     {assignForm.selectedStudentIds.length > 0 && (
                       <button type="button"
                         onClick={() => setAssignForm(f => ({ ...f, selectedStudentIds: [] }))}
-                        className="text-slate-400 hover:text-red-500 font-semibold">
+                        className="text-[rgba(255,255,255,0.25)] hover:text-red-500 font-semibold">
                         Цэвэрлэх
                       </button>
                     )}
@@ -323,15 +323,15 @@ export default function EnrollmentsPage() {
                   value={searchStudent}
                   onChange={e => setSearchStudent(e.target.value)} />
 
-                <div className="border border-slate-200 rounded-xl overflow-hidden max-h-56 overflow-y-auto">
+                <div className="border border-[rgba(255,255,255,0.08)] rounded-xl overflow-hidden max-h-56 overflow-y-auto">
                   {filteredStudentsForModal.length === 0 ? (
-                    <p className="text-center text-slate-400 text-sm py-6">Сурагч олдсонгүй</p>
+                    <p className="text-center text-[rgba(255,255,255,0.25)] text-sm py-6">Сурагч олдсонгүй</p>
                   ) : filteredStudentsForModal.map(s => {
                     const selected = assignForm.selectedStudentIds.includes(s.id);
                     return (
                       <label key={s.id}
-                        className={`flex items-center gap-3 px-4 py-2.5 cursor-pointer transition-colors border-b border-slate-100 last:border-0
-                          ${selected ? 'bg-indigo-50' : 'hover:bg-slate-50'}`}
+                        className={`flex items-center gap-3 px-4 py-2.5 cursor-pointer transition-colors border-b border-[rgba(255,255,255,0.05)] last:border-0
+                          ${selected ? 'bg-indigo-50' : 'hover:bg-[#0a0e1a]'}`}
                       >
                         <div className={`w-5 h-5 rounded-md border-2 flex items-center justify-center transition-all flex-shrink-0
                           ${selected ? 'bg-indigo-600 border-indigo-600' : 'border-slate-300'}`}>
@@ -343,7 +343,7 @@ export default function EnrollmentsPage() {
                         </div>
                         <div className="flex-1 min-w-0">
                           <span className="font-medium text-slate-800 text-sm">{s.firstName} {s.lastName}</span>
-                          <span className="ml-2 font-mono text-xs text-slate-400">{s.studentCode}</span>
+                          <span className="ml-2 font-mono text-xs text-[rgba(255,255,255,0.25)]">{s.studentCode}</span>
                         </div>
                       </label>
                     );
@@ -355,14 +355,14 @@ export default function EnrollmentsPage() {
             {/* Semester + Year */}
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <label className="block text-sm font-semibold text-slate-700 mb-1.5">Улирал *</label>
+                <label className="block text-sm font-semibold text-[rgba(255,255,255,0.7)] mb-1.5">Улирал *</label>
                 <select className="input-field" value={assignForm.semester}
                   onChange={e => setAssignForm(f => ({ ...f, semester: e.target.value }))}>
                   <option>Spring</option><option>Fall</option><option>Summer</option>
                 </select>
               </div>
               <div>
-                <label className="block text-sm font-semibold text-slate-700 mb-1.5">Жил *</label>
+                <label className="block text-sm font-semibold text-[rgba(255,255,255,0.7)] mb-1.5">Жил *</label>
                 <input type="number" className="input-field" value={assignForm.year}
                   onChange={e => setAssignForm(f => ({ ...f, year: e.target.value }))}
                   min="2020" max="2035" required />

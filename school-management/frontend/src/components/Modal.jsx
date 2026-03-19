@@ -3,69 +3,50 @@ import { createPortal } from 'react-dom';
 
 export default function Modal({ title, onClose, children, size = 'md' }) {
   const overlayRef = useRef();
+  const sizeMap = { sm:480, md:560, lg:720, xl:960 };
 
   useEffect(() => {
-    const onKey = (e) => { if (e.key === 'Escape') onClose(); };
+    const onKey = (e) => { if(e.key==='Escape') onClose(); };
     document.addEventListener('keydown', onKey);
-    // Lock body scroll
     const prev = document.body.style.overflow;
     document.body.style.overflow = 'hidden';
-    return () => {
-      document.removeEventListener('keydown', onKey);
-      document.body.style.overflow = prev;
-    };
+    return () => { document.removeEventListener('keydown', onKey); document.body.style.overflow = prev; };
   }, [onClose]);
 
-  const handleBackdrop = (e) => {
-    if (e.target === overlayRef.current) onClose();
-  };
-
-  const sizeMap = { sm: 480, md: 560, lg: 720, xl: 960 };
-
-  const modal = (
-    <div
-      ref={overlayRef}
-      onClick={handleBackdrop}
+  return createPortal(
+    <div ref={overlayRef} onClick={e=>{if(e.target===overlayRef.current)onClose();}}
       style={{
-        position: 'fixed', inset: 0, zIndex: 9999,
-        background: 'rgba(15,23,42,0.5)',
-        display: 'flex', alignItems: 'center', justifyContent: 'center',
-        padding: 16,
-        animation: 'fadeIn 0.18s ease both',
-      }}
-    >
-      <div style={{
-        background: '#fff',
-        borderRadius: 20,
-        boxShadow: '0 25px 60px rgba(0,0,0,0.2)',
-        width: '100%',
-        maxWidth: sizeMap[size],
-        maxHeight: '90vh',
-        overflowY: 'auto',
-        animation: 'scaleIn 0.18s ease both',
+        position:'fixed',inset:0,zIndex:9999,
+        background:'rgba(5,8,18,0.75)', backdropFilter:'blur(4px)',
+        display:'flex',alignItems:'center',justifyContent:'center',padding:20,
+        animation:'fadeIn 0.18s ease both',
       }}>
-        {/* Header */}
+      <div style={{
+        background:'#0f1525', borderRadius:20,
+        border:'1px solid rgba(255,255,255,0.1)',
+        boxShadow:'0 24px 80px rgba(0,0,0,0.8), 0 0 0 1px rgba(255,255,255,0.05)',
+        width:'100%', maxWidth:sizeMap[size], maxHeight:'90vh', overflowY:'auto',
+        animation:'scaleIn 0.2s ease both',
+      }}>
         <div style={{
-          display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-          padding: '16px 24px', borderBottom: '1px solid #f1f5f9',
-          position: 'sticky', top: 0, background: '#fff', borderRadius: '20px 20px 0 0', zIndex: 1,
+          display:'flex',alignItems:'center',justifyContent:'space-between',
+          padding:'16px 22px', borderBottom:'1px solid rgba(255,255,255,0.07)',
+          position:'sticky',top:0,background:'#0f1525',borderRadius:'20px 20px 0 0',zIndex:1,
         }}>
-          <h2 style={{ fontWeight: 700, fontSize: 17, color: '#0f172a', margin: 0 }}>{title}</h2>
+          <h2 style={{fontWeight:800,fontSize:16,color:'#e8eaf0',margin:0,letterSpacing:'-0.01em'}}>{title}</h2>
           <button onClick={onClose} style={{
-            width: 32, height: 32, borderRadius: '50%', border: 'none',
-            background: 'transparent', cursor: 'pointer', fontSize: 20, fontWeight: 700,
-            color: '#94a3b8', display: 'flex', alignItems: 'center', justifyContent: 'center',
-            lineHeight: 1, transition: 'all 0.15s',
+            width:30,height:30,borderRadius:8,border:'none',
+            background:'transparent',cursor:'pointer',fontSize:18,fontWeight:700,
+            color:'rgba(255,255,255,0.3)',display:'flex',alignItems:'center',justifyContent:'center',
+            transition:'all 0.12s', fontFamily:'Syne, sans-serif',
           }}
-            onMouseEnter={e => { e.currentTarget.style.background = '#f1f5f9'; e.currentTarget.style.color = '#475569'; }}
-            onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = '#94a3b8'; }}
+            onMouseEnter={e=>{e.currentTarget.style.background='rgba(255,255,255,0.08)';e.currentTarget.style.color='rgba(255,255,255,0.8)';}}
+            onMouseLeave={e=>{e.currentTarget.style.background='transparent';e.currentTarget.style.color='rgba(255,255,255,0.3)';}}
           >×</button>
         </div>
-        <div style={{ padding: 24 }}>{children}</div>
+        <div style={{padding:'20px 22px 24px'}}>{children}</div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
-
-  // Render directly into document.body — completely escapes any stacking context
-  return createPortal(modal, document.body);
 }

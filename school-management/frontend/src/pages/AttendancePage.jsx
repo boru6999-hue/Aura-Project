@@ -6,9 +6,9 @@ import Modal from '../components/Modal';
 import { SkeletonTable } from '../components/Skeleton';
 
 const STATUS_STYLE = {
-  PRESENT: 'bg-emerald-100 text-emerald-800',
-  ABSENT:  'bg-red-100 text-red-800',
-  LATE:    'bg-yellow-100 text-yellow-800',
+  PRESENT: 'text-[#6bcb77]',
+  ABSENT:  'text-[#ff6b6b]',
+  LATE:    'text-[#ffd93d]',
 };
 const STATUS_MN = { PRESENT: 'Ирсэн', ABSENT: 'Тасалсан', LATE: 'Хоцорсон' };
 
@@ -59,11 +59,11 @@ export default function AttendancePage() {
   const attendRate   = records.length ? Math.round((presentCount/records.length)*100) : 0;
 
   return (
-    <div className="p-6 space-y-5 animate-fade-in">
+    <div className="animate-fade-in" style={{ padding:"28px", minHeight:"100vh", background:"#0a0e1a" }}>
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-slate-900">Ирц</h1>
-          <p className="text-sm text-slate-500">{records.length} нийт бүртгэл</p>
+          <h1 className="text-2xl font-bold">Ирц</h1>
+          <p className="text-sm text-[rgba(255,255,255,0.35)]">{records.length} нийт бүртгэл</p>
         </div>
         {(isAdmin||isTeacher) && (
           <button onClick={()=>{ setForm({studentId:'',courseId:'',status:'PRESENT',date:new Date().toISOString().split('T')[0]}); setShowModal(true); }}
@@ -104,14 +104,14 @@ export default function AttendancePage() {
       {loading ? <SkeletonTable rows={7} cols={4}/> : records.length === 0 ? (
         <div className="card text-center py-16 animate-scale-in">
           <span className="text-5xl">✅</span>
-          <p className="text-slate-400 mt-3 font-medium">Ирцийн бүртгэл олдсонгүй</p>
+          <p className="text-[rgba(255,255,255,0.25)] mt-3 font-medium">Ирцийн бүртгэл олдсонгүй</p>
         </div>
       ) : (
         <div className="card p-0 overflow-hidden animate-fade-in">
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
-              <thead className="bg-slate-50 border-b border-slate-200">
-                <tr>{['Сурагч','Хичээл','Огноо','Статус'].map(h=><th key={h} className="px-4 py-3 text-left text-xs font-bold text-slate-500 uppercase tracking-wider">{h}</th>)}</tr>
+              <thead className="bg-[#0a0e1a] border-b border-[rgba(255,255,255,0.08)]">
+                <tr>{['Сурагч','Хичээл','Огноо','Статус'].map(h=><th key={h} className="px-4 py-3 text-left text-xs font-bold text-[rgba(255,255,255,0.35)] uppercase tracking-wider">{h}</th>)}</tr>
               </thead>
               <tbody className="divide-y divide-slate-100 stagger">
                 {records.map((r,i) => (
@@ -121,11 +121,11 @@ export default function AttendancePage() {
                         <div className="w-7 h-7 rounded-full bg-gradient-to-br from-emerald-400 to-emerald-600 flex items-center justify-center text-white text-xs font-bold flex-shrink-0">
                           {r.student?.firstName?.[0]}{r.student?.lastName?.[0]}
                         </div>
-                        <span className="font-medium text-slate-900">{r.student?.firstName} {r.student?.lastName}</span>
+                        <span className="font-medium text-[#e8eaf0]">{r.student?.firstName} {r.student?.lastName}</span>
                       </div>
                     </td>
-                    <td className="px-4 py-3 text-slate-500 text-xs">{r.course?.name}</td>
-                    <td className="px-4 py-3 text-slate-500">{new Date(r.date).toLocaleDateString('mn-MN')}</td>
+                    <td className="px-4 py-3 text-[rgba(255,255,255,0.35)] text-xs">{r.course?.name}</td>
+                    <td className="px-4 py-3 text-[rgba(255,255,255,0.35)]">{new Date(r.date).toLocaleDateString('mn-MN')}</td>
                     <td className="px-4 py-3">
                       <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold ${STATUS_STYLE[r.status]||'bg-slate-100 text-slate-800'}`}>
                         {STATUS_MN[r.status] || r.status}
@@ -143,34 +143,34 @@ export default function AttendancePage() {
         <Modal title="Ирц бүртгэх" onClose={()=>setShowModal(false)}>
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>
-              <label className="block text-sm font-semibold text-slate-700 mb-1.5">Сурагч *</label>
+              <label className="block text-sm font-semibold text-[rgba(255,255,255,0.7)] mb-1.5">Сурагч *</label>
               <select className="input-field" value={form.studentId} onChange={e=>setForm({...form,studentId:e.target.value})} required>
                 <option value="">Сурагч сонгоно уу</option>
                 {students.map(s=><option key={s.id} value={s.id}>{s.firstName} {s.lastName} ({s.studentCode})</option>)}
               </select>
             </div>
             <div>
-              <label className="block text-sm font-semibold text-slate-700 mb-1.5">Хичээл *</label>
+              <label className="block text-sm font-semibold text-[rgba(255,255,255,0.7)] mb-1.5">Хичээл *</label>
               <select className="input-field" value={form.courseId} onChange={e=>setForm({...form,courseId:e.target.value})} required>
                 <option value="">Хичээл сонгоно уу</option>
                 {courses.map(c=><option key={c.id} value={c.id}>{c.name}</option>)}
               </select>
             </div>
             <div>
-              <label className="block text-sm font-semibold text-slate-700 mb-1.5">Статус</label>
+              <label className="block text-sm font-semibold text-[rgba(255,255,255,0.7)] mb-1.5">Статус</label>
               <div className="grid grid-cols-3 gap-2">
                 {['PRESENT','ABSENT','LATE'].map(s => (
                   <button type="button" key={s}
                     onClick={()=>setForm({...form,status:s})}
                     className={`py-2.5 px-3 rounded-xl text-sm font-semibold border transition-all duration-200 active:scale-95
-                      ${form.status===s ? STATUS_STYLE[s]+' border-current shadow-sm' : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50'}`}>
+                      ${form.status===s ? STATUS_STYLE[s]+' border-current shadow-sm' : 'bg-[#141c2e] border-[rgba(255,255,255,0.08)] text-slate-600 hover:bg-[#0a0e1a]'}`}>
                     {STATUS_MN[s]}
                   </button>
                 ))}
               </div>
             </div>
             <div>
-              <label className="block text-sm font-semibold text-slate-700 mb-1.5">Огноо</label>
+              <label className="block text-sm font-semibold text-[rgba(255,255,255,0.7)] mb-1.5">Огноо</label>
               <input type="date" className="input-field" value={form.date} onChange={e=>setForm({...form,date:e.target.value})} />
             </div>
             <div className="flex gap-3 pt-2">
