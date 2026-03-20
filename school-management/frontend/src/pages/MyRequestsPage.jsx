@@ -1,155 +1,181 @@
-import { useState, useEffect, useCallback } from 'react';
-import api from '../api/axios';
-import { useToast } from '../components/Toast';
+import { useState, useEffect, useCallback } from 'react'
+import api from '../api/axios'
+import { useToast } from '../components/Toast'
+import Modal from '../components/Modal'
+import { PageHeader, SkeletonTable, Empty, ActBtn, Spinner } from '../components/UI'
 
-const DAYS = ['Даваа', 'Мягмар', 'Лхагва', 'Пүрэв', 'Баасан', 'Бямба', 'Ням'];
+const DAYS   = ['Даваа','Мягмар','Лхагва','Пүрэв','Баасан','Бямба','Ням']
+const S_CLS  = {
+  PENDING:  { cls:'badge-amber', label:'ХҮЛЭЭГДЭЖ БУЙ' },
+  APPROVED: { cls:'badge-green', label:'ЗӨВШӨӨРСӨН' },
+  REJECTED: { cls:'badge-red',   label:'ТАТГАЛЗСАН' },
+}
+const isGradeReq = r => r.note?.startsWith('[ДҮНГИЙН ЗАСВАРЫН ХҮСЭЛТ]')
 
-const STATUS_CONFIG = {
-  PENDING:  { label: 'Хүлээгдэж байна', bg:'#fef3c722', color:'#f59e0b', border:'#f59e0b44' },
-  APPROVED: { label: 'Батлагдсан',       bg:'#d1fae522', color:'#10b981', border:'#10b98144' },
-  REJECTED: { label: 'Татгалзсан',       bg:'#fee2e222', color:'#ef4444', border:'#ef444444' },
-};
-
-const CSS = `
-  @import url('https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Mono:wght@400;500&display=swap');
-  .mr-root { font-family:'Syne',sans-serif; background:#0a0e1a; min-height:100vh; padding:28px 24px; color:#e8eaf0; }
-  .mr-header { margin-bottom:28px; }
-  .mr-header h1 { font-size:26px; font-weight:800; color:#fff; margin:0; }
-  .mr-header .subtitle { font-family:'DM Mono',monospace; font-size:11px; color:#00d4ff; margin-top:6px; letter-spacing:0.08em; }
-  .filter-tabs { display:flex; gap:6px; margin-bottom:24px; flex-wrap:wrap; }
-  .filter-tab { padding:7px 16px; border-radius:4px; font-size:12px; font-weight:700; cursor:pointer; border:1.5px solid; transition:all 0.15s; font-family:'DM Mono',monospace; }
-  .tab-on  { background:#00d4ff; color:#001a20; border-color:#00d4ff; }
-  .tab-off { background:transparent; color:#556; border-color:#1e2535; }
-  .tab-off:hover { border-color:#00d4ff44; color:#00d4ff88; }
-  .req-list { display:flex; flex-direction:column; gap:10px; }
-  .req-card { background:#111827; border:1px solid #1e2a3a; border-radius:12px; padding:18px 20px; display:flex; flex-direction:column; gap:12px; }
-  .req-top { display:flex; align-items:flex-start; justify-content:space-between; gap:12px; flex-wrap:wrap; }
-  .course-tag { display:inline-flex; gap:6px; align-items:center; background:#00d4ff11; border:1px solid #00d4ff33; border-radius:5px; padding:4px 10px; }
-  .course-code { font-family:'DM Mono',monospace; font-size:11px; font-weight:700; color:#00d4ff; }
-  .course-name { font-size:11px; color:#64748b; }
-  .status-pill { padding:4px 12px; border-radius:4px; font-size:11px; font-weight:700; font-family:'DM Mono',monospace; letter-spacing:0.05em; }
-  .slots-grid { display:grid; grid-template-columns:1fr 1fr; gap:10px; }
-  .slot-box { background:#0d1120; border:1px solid #1a2236; border-radius:8px; padding:12px 14px; }
-  .slot-lbl { font-family:'DM Mono',monospace; font-size:9px; color:#4a5568; letter-spacing:0.1em; text-transform:uppercase; margin-bottom:6px; }
-  .slot-row { display:flex; align-items:center; gap:6px; margin-top:4px; }
-  .slot-val { font-size:12px; font-weight:600; color:#cbd5e1; font-family:'DM Mono',monospace; }
-  .note-box { background:#0d1120; border:1px solid #1a2236; border-left:3px solid #f59e0b; border-radius:6px; padding:10px 14px; font-size:12px; color:#94a3b8; }
-  .admin-note { background:#0d1120; border:1px solid #1a2236; border-left:3px solid #00d4ff; border-radius:6px; padding:10px 14px; font-size:12px; color:#94a3b8; }
-  .meta { font-family:'DM Mono',monospace; font-size:10px; color:#2a3a4a; }
-  .btn-cancel { background:transparent; color:#ef4444; border:1.5px solid #ef444433; border-radius:6px; padding:6px 14px; font-size:12px; font-weight:700; cursor:pointer; transition:all 0.15s; }
-  .btn-cancel:hover { background:#ef444411; border-color:#ef4444; }
-  .empty { text-align:center; padding:80px 0; color:#2a3a4a; font-family:'DM Mono',monospace; font-size:12px; letter-spacing:0.08em; }
-`;
+function parseGradeNote(note) {
+  try {
+    const student = note.match(/Сурагч: ([^|]+)/)?.[1]?.trim()
+    const change  = note.match(/Одоогийн: ([^|]+)/)?.[1]?.trim()
+    const reason  = note.match(/Тайлбар: (.+)/)?.[1]?.trim()
+    return { student, change, reason }
+  } catch { return {} }
+}
 
 export default function MyRequestsPage() {
-  const { show: toast } = useToast();
-  const [requests, setRequests] = useState([]);
-  const [loading,  setLoading]  = useState(true);
-  const [filter,   setFilter]   = useState('ALL');
+  const { show: toast } = useToast()
+  const [rows, setRows]       = useState([])
+  const [courses, setCourses] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [modal, setModal]     = useState(false)
+  const [form, setForm]       = useState({ courseId:'', dayOfWeek:0, startTime:'08:00', endTime:'09:40', room:'', semester:'Spring', year:new Date().getFullYear(), note:'' })
+  const [saving, setSaving]   = useState(false)
+  const [tab, setTab]         = useState('all')
 
-  const fetchRequests = useCallback(async () => {
-    setLoading(true);
+  const load = useCallback(async () => {
+    setLoading(true)
     try {
-      const res = await api.get('/schedule-requests');
-      setRequests(res.data.data || []);
-    } catch { toast('Хүсэлтүүд ачааллахад алдаа гарлаа', 'error'); }
-    finally { setLoading(false); }
-  }, []);
+      const [r, c] = await Promise.all([api.get('/schedule-requests'), api.get('/courses?limit=200')])
+      setRows(r.data.data || []); setCourses(c.data.data || [])
+    } catch { toast('Ачааллахад алдаа', 'error') }
+    finally { setLoading(false) }
+  }, [])
 
-  useEffect(() => { fetchRequests(); }, [fetchRequests]);
+  useEffect(() => { load() }, [load])
 
-  const handleCancel = async (id) => {
-    if (!confirm('Хүсэлтийг цуцлах уу?')) return;
+  const save = async e => {
+    e.preventDefault(); setSaving(true)
     try {
-      await api.delete(`/schedule-requests/${id}`);
-      toast('Хүсэлт цуцлагдлаа', 'info');
-      fetchRequests();
-    } catch (err) { toast(err.response?.data?.error || 'Алдаа гарлаа', 'error'); }
-  };
+      await api.post('/schedule-requests', { ...form, courseId:Number(form.courseId), dayOfWeek:Number(form.dayOfWeek), year:Number(form.year) })
+      toast('Хүсэлт илгээгдлээ', 'success'); setModal(false); load()
+    } catch (err) { toast(err.response?.data?.error || 'Алдаа', 'error') }
+    finally { setSaving(false) }
+  }
 
-  const FILTERS = [
-    { key: 'ALL',      label: 'Бүгд' },
-    { key: 'PENDING',  label: 'Хүлээгдэж байна' },
-    { key: 'APPROVED', label: 'Батлагдсан' },
-    { key: 'REJECTED', label: 'Татгалзсан' },
-  ];
+  const cancel = async id => {
+    if (!confirm('Цуцлах уу?')) return
+    try { await api.delete(`/schedule-requests/${id}`); toast('Цуцлагдлаа', 'info'); load() }
+    catch (err) { toast(err.response?.data?.error || 'Алдаа', 'error') }
+  }
 
-  const filtered = filter === 'ALL' ? requests : requests.filter(r => r.status === filter);
-  const pendingCount = requests.filter(r => r.status === 'PENDING').length;
+  const filtered = rows.filter(r => {
+    if (tab === 'schedule') return !isGradeReq(r)
+    if (tab === 'grade')    return isGradeReq(r)
+    return true
+  })
+
+  const pending = rows.filter(r => r.status === 'PENDING').length
 
   return (
-    <>
-      <style>{CSS}</style>
-      <div className="mr-root">
-        <div className="mr-header">
-          <h1>Миний хүсэлтүүд</h1>
-          <div className="subtitle">// My Schedule Requests · {pendingCount} хүлээгдэж байна</div>
-        </div>
+    <div className="page">
+      <PageHeader eyebrow="БАГШ" titleMain="МИНИЙ " titleDim="ХҮСЭЛТ"
+        meta={`${rows.length} нийт · ${pending} хүлээгдэж буй`}
+        action={<button className="btn btn-primary" onClick={() => setModal(true)}>＋ ХУВААРИЙН ХҮСЭЛТ</button>} />
 
-        <div className="filter-tabs">
-          {FILTERS.map(f => (
-            <button key={f.key} className={`filter-tab ${filter === f.key ? 'tab-on' : 'tab-off'}`}
-              onClick={() => setFilter(f.key)}>{f.label}</button>
-          ))}
-        </div>
-
-        {loading ? (
-          <div className="empty">
-            <div style={{ width:28,height:28,border:'2px solid #1e2a3a',borderTopColor:'#00d4ff',borderRadius:'50%',animation:'spin 0.8s linear infinite',margin:'0 auto 12px' }} />
-            LOADING...
-          </div>
-        ) : filtered.length === 0 ? (
-          <div className="empty">📋 ХҮСЭЛТ БАЙХГҮЙ</div>
-        ) : (
-          <div className="req-list">
-            {filtered.map(req => {
-              const st = STATUS_CONFIG[req.status] || STATUS_CONFIG.PENDING;
-              return (
-                <div className="req-card" key={req.id} style={{ borderColor: req.status === 'PENDING' ? '#f59e0b22' : req.status === 'APPROVED' ? '#10b98122' : '#1e2a3a' }}>
-                  <div className="req-top">
-                    <div className="course-tag">
-                      <span className="course-code">{req.course?.courseCode}</span>
-                      <span className="course-name">{req.course?.name}</span>
-                    </div>
-                    <div style={{ display:'flex', gap:8, alignItems:'center' }}>
-                      <span className="status-pill" style={{ background: st.bg, color: st.color, border:`1px solid ${st.border}` }}>{st.label}</span>
-                      <span className="meta">{new Date(req.createdAt).toLocaleDateString('mn-MN')}</span>
-                    </div>
-                  </div>
-
-                  <div className="slots-grid">
-                    {req.oldStartTime && (
-                      <div className="slot-box">
-                        <div className="slot-lbl">⬅ Одоогийн</div>
-                        <div className="slot-row"><span style={{ fontSize:11, color:'#4a5568', width:14 }}>📅</span><span className="slot-val">{DAYS[req.oldDayOfWeek]}</span></div>
-                        <div className="slot-row"><span style={{ fontSize:11, color:'#4a5568', width:14 }}>⏰</span><span className="slot-val">{req.oldStartTime} – {req.oldEndTime}</span></div>
-                        {req.oldRoom && <div className="slot-row"><span style={{ fontSize:11, color:'#4a5568', width:14 }}>🚪</span><span className="slot-val">{req.oldRoom}</span></div>}
-                      </div>
-                    )}
-                    <div className="slot-box" style={{ borderColor:'#00d4ff33' }}>
-                      <div className="slot-lbl" style={{ color:'#00d4ff' }}>➡ Хүссэн цаг</div>
-                      <div className="slot-row"><span style={{ fontSize:11, color:'#4a5568', width:14 }}>📅</span><span className="slot-val" style={{ color:'#00d4ff' }}>{DAYS[req.dayOfWeek]}</span></div>
-                      <div className="slot-row"><span style={{ fontSize:11, color:'#4a5568', width:14 }}>⏰</span><span className="slot-val" style={{ color:'#00d4ff' }}>{req.startTime} – {req.endTime}</span></div>
-                      {req.room && <div className="slot-row"><span style={{ fontSize:11, color:'#4a5568', width:14 }}>🚪</span><span className="slot-val" style={{ color:'#00d4ff' }}>{req.room}</span></div>}
-                      <div className="slot-row"><span style={{ fontSize:11, color:'#4a5568', width:14 }}>📚</span><span className="slot-val">{req.semester} {req.year}</span></div>
-                    </div>
-                  </div>
-
-                  {req.note && <div className="note-box">💬 {req.note}</div>}
-                  {req.adminNote && <div className="admin-note">🔷 Админ: {req.adminNote}</div>}
-                  {req.reviewedAt && <div className="meta">Шийдвэрлэсэн: {new Date(req.reviewedAt).toLocaleString('mn-MN')}</div>}
-
-                  {req.status === 'PENDING' && (
-                    <div>
-                      <button className="btn-cancel" onClick={() => handleCancel(req.id)}>✕ Цуцлах</button>
-                    </div>
-                  )}
-                </div>
-              );
-            })}
-          </div>
-        )}
+      {/* Tabs */}
+      <div style={{ display:'flex', border:'1.5px solid var(--border)', overflow:'hidden', marginBottom:14, width:'fit-content' }}>
+        {[
+          ['all',      `БҮГД (${rows.length})`],
+          ['schedule', 'ХУВААРЬ'],
+          ['grade',    'ДҮНГИЙН ЗАСВАР'],
+        ].map(([v,label]) => (
+          <button key={v} onClick={() => setTab(v)} style={{ padding:'8px 18px', fontFamily:'Barlow Condensed,sans-serif', fontWeight:800, fontSize:11, letterSpacing:'0.08em', textTransform:'uppercase', background:tab===v?'var(--navy)':'transparent', color:tab===v?'var(--beige)':'var(--muted)', border:'none', cursor:'pointer', transition:'all 0.12s', whiteSpace:'nowrap' }}>{label}</button>
+        ))}
       </div>
-    </>
-  );
+
+      {loading ? <SkeletonTable rows={6} cols={5} /> : filtered.length === 0 ? <Empty text="ХҮСЭЛТ БАЙХГҮЙ" /> : (
+        <div className="anim-fade" style={{ background:'var(--bg-card)', border:'1.5px solid var(--border-light)', overflowX:'auto' }}>
+          <table className="tbl">
+            <thead><tr>{['ТӨРӨЛ','ДЭЛГЭРЭНГҮЙ','УЛИРАЛ','СТАТУС','ОГНОО','ҮЙЛДЭЛ'].map(h => <th key={h}>{h}</th>)}</tr></thead>
+            <tbody>
+              {filtered.map(r => {
+                const s     = S_CLS[r.status] || S_CLS.PENDING
+                const grade = isGradeReq(r)
+                const parsed = grade ? parseGradeNote(r.note) : null
+                return (
+                  <tr key={r.id}>
+                    <td>
+                      {grade
+                        ? <span className="badge badge-amber" style={{ fontSize:9 }}>ДҮН</span>
+                        : <span className="badge badge-navy"  style={{ fontSize:9 }}>ХУВААРЬ</span>}
+                    </td>
+                    <td style={{ maxWidth:260 }}>
+                      {grade ? (
+                        <div>
+                          <div style={{ fontFamily:'Barlow,sans-serif', fontSize:12, fontWeight:600, color:'var(--text-main)' }}>{parsed?.student}</div>
+                          <div style={{ fontFamily:'Share Tech Mono,monospace', fontSize:10, color:'var(--text-muted)' }}>{parsed?.change}</div>
+                          {r.adminNote && r.status !== 'PENDING' && (
+                            <div style={{ fontFamily:'Barlow,sans-serif', fontSize:11, color: r.status==='APPROVED'?'var(--green)':'var(--red)', marginTop:3 }}>
+                              Админ: {r.adminNote}
+                            </div>
+                          )}
+                        </div>
+                      ) : (
+                        <div>
+                          <div style={{ fontFamily:'Barlow,sans-serif', fontSize:12, fontWeight:600, color:'var(--text-main)' }}>{r.course?.name}</div>
+                          <div style={{ fontFamily:'Share Tech Mono,monospace', fontSize:10, color:'var(--text-muted)' }}>{DAYS[r.dayOfWeek]} · {r.startTime}–{r.endTime}{r.room ? ` · ${r.room}` : ''}</div>
+                          {r.adminNote && r.status !== 'PENDING' && (
+                            <div style={{ fontFamily:'Barlow,sans-serif', fontSize:11, color: r.status==='APPROVED'?'var(--green)':'var(--red)', marginTop:3 }}>
+                              Админ: {r.adminNote}
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </td>
+                    <td><span className="badge badge-beige" style={{ fontSize:9 }}>{r.semester} {r.year}</span></td>
+                    <td><span className={`badge ${s.cls}`} style={{ fontSize:9 }}>{s.label}</span></td>
+                    <td style={{ fontFamily:'Share Tech Mono,monospace', fontSize:10, color:'var(--text-faint)', whiteSpace:'nowrap' }}>
+                      {new Date(r.createdAt).toLocaleDateString()}
+                    </td>
+                    <td>{r.status === 'PENDING' && <ActBtn label="ЦУЦЛАХ" danger onClick={() => cancel(r.id)} />}</td>
+                  </tr>
+                )
+              })}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      {/* New schedule request modal */}
+      {modal && (
+        <Modal title="Хуваарийн хүсэлт" onClose={() => setModal(false)}>
+          <form onSubmit={save} style={{ display:'contents' }}>
+            <div>
+              <label className="form-label">Хичээл *</label>
+              <select className="input" value={form.courseId} onChange={e=>setForm({...form,courseId:e.target.value})} required>
+                <option value="">Сонгоно уу</option>
+                {courses.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+              </select>
+            </div>
+            <div>
+              <label className="form-label">Өдөр *</label>
+              <div style={{ display:'grid', gridTemplateColumns:'repeat(5,1fr)', gap:6 }}>
+                {DAYS.slice(0,5).map((d,i) => (
+                  <button key={i} type="button" onClick={() => setForm({...form,dayOfWeek:i})} style={{ padding:'7px 4px', fontFamily:'Barlow Condensed,sans-serif', fontWeight:800, fontSize:11, letterSpacing:'0.04em', textTransform:'uppercase', cursor:'pointer', border:'1.5px solid var(--border)', transition:'all 0.12s', background:Number(form.dayOfWeek)===i?'var(--navy)':'transparent', color:Number(form.dayOfWeek)===i?'var(--beige)':'var(--muted)', borderColor:Number(form.dayOfWeek)===i?'var(--navy)':'var(--border)' }}>{d.slice(0,2)}</button>
+                ))}
+              </div>
+            </div>
+            <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:12 }}>
+              <div><label className="form-label">Эхлэх</label><input className="input" type="time" value={form.startTime} onChange={e=>setForm({...form,startTime:e.target.value})} /></div>
+              <div><label className="form-label">Дуусах</label><input className="input" type="time" value={form.endTime} onChange={e=>setForm({...form,endTime:e.target.value})} /></div>
+            </div>
+            <div><label className="form-label">Өрөө</label><input className="input" value={form.room} onChange={e=>setForm({...form,room:e.target.value})} /></div>
+            <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:12 }}>
+              <div>
+                <label className="form-label">Улирал</label>
+                <select className="input" value={form.semester} onChange={e=>setForm({...form,semester:e.target.value})}>
+                  <option>Spring</option><option>Fall</option><option>Summer</option>
+                </select>
+              </div>
+              <div><label className="form-label">Жил</label><input className="input" type="number" value={form.year} onChange={e=>setForm({...form,year:e.target.value})} /></div>
+            </div>
+            <div><label className="form-label">Тайлбар</label><textarea className="input" rows={3} style={{ resize:'none' }} value={form.note} onChange={e=>setForm({...form,note:e.target.value})} /></div>
+            <div style={{ display:'flex', gap:10, paddingTop:4 }}>
+              <button type="submit" disabled={saving} className="btn btn-primary" style={{ flex:1 }}>{saving ? <Spinner /> : 'ИЛГЭЭХ'}</button>
+              <button type="button" onClick={() => setModal(false)} className="btn btn-ghost" style={{ flex:1 }}>БОЛИХ</button>
+            </div>
+          </form>
+        </Modal>
+      )}
+    </div>
+  )
 }

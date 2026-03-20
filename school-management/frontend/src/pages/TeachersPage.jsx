@@ -1,144 +1,109 @@
-import { useState, useEffect, useCallback } from 'react';
-import api from '../api/axios';
-import { useAuth } from '../context/AuthContext';
-import { useToast } from '../components/Toast';
-import Modal from '../components/Modal';
-import { SkeletonTable } from '../components/Skeleton';
+import { useState, useEffect, useCallback } from 'react'
+import api from '../api/axios'
+import { useAuth } from '../context/AuthContext'
+import { useToast } from '../components/Toast'
+import Modal from '../components/Modal'
+import { PageHeader, SkeletonTable, Empty, ActBtn, Avatar, Code, Pagination, Spinner } from '../components/UI'
+
+const EMPTY = { email:'', password:'', firstName:'', lastName:'', department:'', phone:'' }
 
 export default function TeachersPage() {
-  const { isAdmin } = useAuth();
-  const { show: toast } = useToast();
-  const [teachers, setTeachers] = useState([]);
-  const [meta, setMeta] = useState({});
-  const [search, setSearch] = useState('');
-  const [page, setPage] = useState(1);
-  const [loading, setLoading] = useState(true);
-  const [showModal, setShowModal] = useState(false);
-  const [form, setForm] = useState({ email:'', password:'', firstName:'', lastName:'', department:'', phone:'' });
-  const [editId, setEditId] = useState(null);
-  const [submitting, setSubmitting] = useState(false);
+  const { isAdmin } = useAuth()
+  const { show: toast } = useToast()
+  const [rows, setRows]     = useState([])
+  const [meta, setMeta]     = useState({})
+  const [search, setSearch] = useState('')
+  const [page, setPage]     = useState(1)
+  const [loading, setLoading] = useState(true)
+  const [modal, setModal]   = useState(false)
+  const [form, setForm]     = useState(EMPTY)
+  const [editId, setEditId] = useState(null)
+  const [saving, setSaving] = useState(false)
 
-  const fetch = useCallback(async () => {
-    setLoading(true);
+  const load = useCallback(async () => {
+    setLoading(true)
+    try { const r = await api.get('/teachers', { params:{ search, page, limit:12 } }); setRows(r.data.data); setMeta(r.data.meta) }
+    catch { toast('Ачааллахад алдаа гарлаа', 'error') }
+    finally { setLoading(false) }
+  }, [search, page])
+
+  useEffect(() => { load() }, [load])
+
+  const openCreate = () => { setForm(EMPTY); setEditId(null); setModal(true) }
+  const openEdit   = t => { setForm({ firstName:t.firstName, lastName:t.lastName, department:t.department||'', phone:t.phone||'', email:'', password:'' }); setEditId(t.id); setModal(true) }
+
+  const save = async e => {
+    e.preventDefault(); setSaving(true)
     try {
-      const res = await api.get('/teachers', { params: { search, page, limit: 10 } });
-      setTeachers(res.data.data); setMeta(res.data.meta);
-    } catch { toast('Ачааллахад алдаа гарлаа', 'error'); }
-    finally { setLoading(false); }
-  }, [search, page]);
+      if (editId) { await api.put(`/teachers/${editId}`, form); toast('Шинэчлэгдлээ', 'success') }
+      else        { await api.post('/teachers', form); toast('Нэмэгдлээ', 'success') }
+      setModal(false); load()
+    } catch (err) { toast(err.response?.data?.error || 'Алдаа', 'error') }
+    finally { setSaving(false) }
+  }
 
-  useEffect(() => { fetch(); }, [fetch]);
-
-  const openCreate = () => { setForm({ email:'', password:'', firstName:'', lastName:'', department:'', phone:'' }); setEditId(null); setShowModal(true); };
-  const openEdit   = (t) => { setForm({ firstName:t.firstName, lastName:t.lastName, department:t.department||'', phone:t.phone||'', email:'', password:'' }); setEditId(t.id); setShowModal(true); };
-
-  const handleSubmit = async (e) => {
-    e.preventDefault(); setSubmitting(true);
-    try {
-      if (editId) { await api.put(`/teachers/${editId}`, form); toast('Багшийн мэдээлэл шинэчлэгдлээ', 'success'); }
-      else         { await api.post('/teachers', form);          toast('Багш амжилттай нэмэгдлээ 🎉', 'success'); }
-      setShowModal(false); fetch();
-    } catch (err) { toast(err.response?.data?.error||'Алдаа гарлаа','error'); }
-    finally { setSubmitting(false); }
-  };
-
-  const handleDelete = async (id, name) => {
-    if (!confirm(`"${name}" багшийг устгах уу?`)) return;
-    try { await api.delete(`/teachers/${id}`); toast(`${name} устгагдлаа`,'info'); fetch(); }
-    catch (err) { toast(err.response?.data?.error||'Устгахад алдаа гарлаа','error'); }
-  };
+  const del = async (id, name) => {
+    if (!confirm(`"${name}" устгах уу?`)) return
+    try { await api.delete(`/teachers/${id}`); toast(`${name} устгагдлаа`, 'info'); load() }
+    catch (err) { toast(err.response?.data?.error || 'Устгахад алдаа', 'error') }
+  }
 
   return (
-    <div className="animate-fade-in" style={{ padding:"28px", minHeight:"100vh", background:"#0a0e1a" }}>
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold">Багш нар</h1>
-          <p className="text-sm text-[rgba(255,255,255,0.35)]">{meta.total||0} нийт багш</p>
-        </div>
-        {isAdmin && <button onClick={openCreate} className="btn-primary animate-bounce-in">＋ Нэмэх</button>}
+    <div className="page">
+      <PageHeader eyebrow="БҮРТГЭЛ" titleMain="БАГШ " titleDim="НАР" meta={`${meta.total||0} нийт багш`}
+        action={isAdmin && <button className="btn btn-primary" onClick={openCreate}>＋ НЭМЭХ</button>} />
+
+      <div style={{ marginBottom:14 }}>
+        <input className="input" style={{ maxWidth:320 }} placeholder="Нэр, код хайх..." value={search} onChange={e => { setSearch(e.target.value); setPage(1) }} />
       </div>
 
-      <div className="card p-4 animate-slide-down">
-        <input placeholder="Нэр, код хайх..." value={search}
-          onChange={e=>{ setSearch(e.target.value); setPage(1); }}
-          className="input-field max-w-sm" />
-      </div>
-
-      {loading ? <SkeletonTable rows={6} cols={5}/> : teachers.length === 0 ? (
-        <div className="card text-center py-16 animate-scale-in">
-          <span className="text-5xl">👩‍🏫</span>
-          <p className="text-[rgba(255,255,255,0.25)] mt-3 font-medium">Багш олдсонгүй</p>
-        </div>
-      ) : (
-        <div className="card p-0 overflow-hidden animate-fade-in">
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead className="bg-[#0a0e1a] border-b border-[rgba(255,255,255,0.08)]">
-                <tr>{['Код','Нэр','Тэнхим','И-мэйл','Хичээл','Үйлдэл'].map(h=><th key={h} className="px-4 py-3 text-left text-xs font-bold text-[rgba(255,255,255,0.35)] uppercase tracking-wider">{h}</th>)}</tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100 stagger">
-                {teachers.map((t,i) => (
-                  <tr key={t.id} className="table-row-hover animate-fade-in" style={{ animationDelay:`${i*0.05}s` }}>
-                    <td className="px-4 py-3"><span className="font-mono text-xs bg-slate-100 text-slate-600 px-2 py-0.5 rounded-lg">{t.teacherCode}</span></td>
-                    <td className="px-4 py-3">
-                      <div className="flex items-center gap-2">
-                        <div className="w-7 h-7 rounded-full bg-gradient-to-br from-violet-400 to-violet-600 flex items-center justify-center text-white text-xs font-bold flex-shrink-0">
-                          {t.firstName?.[0]}{t.lastName?.[0]}
-                        </div>
-                        <span className="font-medium text-[#e8eaf0]">{t.firstName} {t.lastName}</span>
-                      </div>
-                    </td>
-                    <td className="px-4 py-3 text-[rgba(255,255,255,0.35)]">{t.department||'—'}</td>
-                    <td className="px-4 py-3 text-[rgba(255,255,255,0.35)]">{t.user?.email}</td>
-                    <td className="px-4 py-3"><span className="badge-teacher">{t._count?.courses||0}</span></td>
-                    <td className="px-4 py-3">
-                      {isAdmin && (
-                        <div className="flex gap-1">
-                          <button onClick={()=>openEdit(t)} className="text-xs text-indigo-600 hover:text-indigo-800 font-semibold px-2.5 py-1.5 rounded-lg hover:bg-indigo-50 transition-all">Засах</button>
-                          <button onClick={()=>handleDelete(t.id,`${t.firstName} ${t.lastName}`)} className="text-xs text-red-500 hover:text-red-700 font-semibold px-2.5 py-1.5 rounded-lg hover:bg-red-50 transition-all">Устгах</button>
-                        </div>
-                      )}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+      {loading ? <SkeletonTable rows={8} cols={6} /> : rows.length === 0 ? <Empty /> : (
+        <div className="anim-fade" style={{ background:'var(--bg-card)', border:'1.5px solid var(--border-light)', overflowX:'auto' }}>
+          <table className="tbl">
+            <thead><tr>{['КОД','НЭР','ТЭНХИМ','И-МЭЙЛ','ХИЧЭЭЛ','ҮЙЛДЭЛ'].map(h => <th key={h}>{h}</th>)}</tr></thead>
+            <tbody>
+              {rows.map(t => (
+                <tr key={t.id}>
+                  <td><Code>{t.teacherCode}</Code></td>
+                  <td><div style={{ display:'flex', alignItems:'center', gap:9 }}><Avatar first={t.firstName} last={t.lastName} /><span style={{ fontWeight:600 }}>{t.firstName} {t.lastName}</span></div></td>
+                  <td style={{ color:'var(--text-muted)' }}>{t.department || '—'}</td>
+                  <td style={{ color:'var(--text-muted)' }}>{t.user?.email}</td>
+                  <td><span className="badge badge-navy">{t._count?.courses||0}</span></td>
+                  <td>
+                    {isAdmin && <div style={{ display:'flex', gap:6 }}>
+                      <ActBtn label="ЗАСАХ" onClick={() => openEdit(t)} />
+                      <ActBtn label="УСТГАХ" danger onClick={() => del(t.id, `${t.firstName} ${t.lastName}`)} />
+                    </div>}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
         </div>
       )}
 
-      {meta.totalPages > 1 && (
-        <div className="flex items-center justify-between">
-          <p className="text-sm text-[rgba(255,255,255,0.35)]">{meta.page}/{meta.totalPages} хуудас</p>
-          <div className="flex gap-2">
-            <button disabled={page<=1} onClick={()=>setPage(p=>p-1)} className="btn-secondary text-sm py-1.5 disabled:opacity-40">← Өмнөх</button>
-            <button disabled={page>=meta.totalPages} onClick={()=>setPage(p=>p+1)} className="btn-secondary text-sm py-1.5 disabled:opacity-40">Дараах →</button>
-          </div>
-        </div>
-      )}
+      <Pagination page={page} totalPages={meta.totalPages} onPage={setPage} />
 
-      {showModal && (
-        <Modal title={editId ? 'Багш засах' : 'Багш нэмэх'} onClose={()=>setShowModal(false)}>
-          <form onSubmit={handleSubmit} className="space-y-4">
+      {modal && (
+        <Modal title={editId ? 'Багш засах' : 'Багш нэмэх'} onClose={() => setModal(false)}>
+          <form onSubmit={save} style={{ display:'contents' }}>
             {!editId && <>
-              <div><label className="block text-sm font-semibold text-[rgba(255,255,255,0.7)] mb-1.5">И-мэйл *</label><input className="input-field" value={form.email} onChange={e=>setForm({...form,email:e.target.value})} required /></div>
-              <div><label className="block text-sm font-semibold text-[rgba(255,255,255,0.7)] mb-1.5">Нууц үг</label><input type="password" className="input-field" placeholder="Default: teacher123" value={form.password} onChange={e=>setForm({...form,password:e.target.value})} /></div>
+              <div><label className="form-label">И-мэйл *</label><input className="input" type="email" value={form.email} onChange={e=>setForm({...form,email:e.target.value})} required /></div>
+              <div><label className="form-label">Нууц үг</label><input className="input" type="password" placeholder="teacher123" value={form.password} onChange={e=>setForm({...form,password:e.target.value})} /></div>
             </>}
-            <div className="grid grid-cols-2 gap-4">
-              <div><label className="block text-sm font-semibold text-[rgba(255,255,255,0.7)] mb-1.5">Нэр *</label><input className="input-field" value={form.firstName} onChange={e=>setForm({...form,firstName:e.target.value})} required /></div>
-              <div><label className="block text-sm font-semibold text-[rgba(255,255,255,0.7)] mb-1.5">Овог *</label><input className="input-field" value={form.lastName} onChange={e=>setForm({...form,lastName:e.target.value})} required /></div>
+            <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:12 }}>
+              <div><label className="form-label">Нэр *</label><input className="input" value={form.firstName} onChange={e=>setForm({...form,firstName:e.target.value})} required /></div>
+              <div><label className="form-label">Овог *</label><input className="input" value={form.lastName} onChange={e=>setForm({...form,lastName:e.target.value})} required /></div>
             </div>
-            <div><label className="block text-sm font-semibold text-[rgba(255,255,255,0.7)] mb-1.5">Тэнхим</label><input className="input-field" value={form.department} onChange={e=>setForm({...form,department:e.target.value})} /></div>
-            <div><label className="block text-sm font-semibold text-[rgba(255,255,255,0.7)] mb-1.5">Утас</label><input className="input-field" value={form.phone} onChange={e=>setForm({...form,phone:e.target.value})} /></div>
-            <div className="flex gap-3 pt-2">
-              <button type="submit" disabled={submitting} className="btn-primary flex-1">
-                {submitting ? <span className="flex items-center justify-center gap-2"><span className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"/>Хадгалж байна...</span> : (editId?'Шинэчлэх':'Нэмэх')}
-              </button>
-              <button type="button" onClick={()=>setShowModal(false)} className="btn-secondary flex-1">Болих</button>
+            <div><label className="form-label">Тэнхим</label><input className="input" value={form.department} onChange={e=>setForm({...form,department:e.target.value})} /></div>
+            <div><label className="form-label">Утас</label><input className="input" value={form.phone} onChange={e=>setForm({...form,phone:e.target.value})} /></div>
+            <div style={{ display:'flex', gap:10, paddingTop:4 }}>
+              <button type="submit" disabled={saving} className="btn btn-primary" style={{ flex:1 }}>{saving ? <Spinner /> : editId ? 'ШИНЭЧЛЭХ' : 'НЭМЭХ'}</button>
+              <button type="button" onClick={() => setModal(false)} className="btn btn-ghost" style={{ flex:1 }}>БОЛИХ</button>
             </div>
           </form>
         </Modal>
       )}
     </div>
-  );
+  )
 }

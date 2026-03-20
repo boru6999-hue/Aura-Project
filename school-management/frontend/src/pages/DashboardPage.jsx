@@ -1,146 +1,256 @@
-import { useState, useEffect } from 'react';
-import api from '../api/axios';
-import { useAuth } from '../context/AuthContext';
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, Legend } from 'recharts';
-import { SkeletonCard } from '../components/Skeleton';
+import { useState, useEffect } from 'react'
+import api from '../api/axios'
+import { useAuth } from '../context/AuthContext'
+import { PageHeader, StatCard, BarGraph, SkeletonCards } from '../components/UI'
 
-const COLORS = ['#00d4ff', '#6bcb77', '#ffd93d', '#ff6b6b', '#c77dff'];
-const ROLE_CFG = {
-  ADMIN: { color: '#c77dff', bg: 'rgba(199,125,255,0.1)', border: 'rgba(199,125,255,0.2)' },
-  TEACHER: { color: '#00d4ff', bg: 'rgba(0,212,255,0.08)', border: 'rgba(0,212,255,0.2)' },
-  STUDENT: { color: '#6bcb77', bg: 'rgba(107,203,119,0.08)', border: 'rgba(107,203,119,0.2)' },
-};
-
-const StatCard = ({ label, value, icon, accentColor, delay = 0 }) => (
-  <div className="animate-fade-in" style={{ animationDelay: `${delay}s` }}>
-    <div style={{
-      background: '#141c2e', borderRadius: 16, padding: '18px 20px',
-      border: '1px solid rgba(255,255,255,0.06)',
-      boxShadow: '0 2px 8px rgba(0,0,0,0.4)',
-      display: 'flex', alignItems: 'center', gap: 14,
-      transition: 'all 0.18s', cursor: 'default',
-    }}
-      onMouseEnter={e => { e.currentTarget.style.borderColor = accentColor + '40'; e.currentTarget.style.boxShadow = `0 0 24px ${accentColor}18`; e.currentTarget.style.transform = 'translateY(-2px)'; }}
-      onMouseLeave={e => { e.currentTarget.style.borderColor = 'rgba(255,255,255,0.06)'; e.currentTarget.style.boxShadow = '0 2px 8px rgba(0,0,0,0.4)'; e.currentTarget.style.transform = ''; }}
-    >
-      <div style={{ width: 44, height: 44, borderRadius: 12, background: `${accentColor}15`, border: `1px solid ${accentColor}30`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 20, flexShrink: 0 }}>
-        {icon}
-      </div>
-      <div>
-        <div style={{ fontSize: 10, fontWeight: 700, color: 'rgba(255,255,255,0.3)', textTransform: 'uppercase', letterSpacing: '0.08em', fontFamily: "'DM Mono',monospace" }}>{label}</div>
-        <div style={{ fontSize: 28, fontWeight: 800, color: '#e8eaf0', marginTop: 2, letterSpacing: '-0.03em' }}>{value}</div>
-      </div>
-    </div>
-  </div>
-);
-
-const DarkTooltip = ({ active, payload, label }) => {
-  if (active && payload?.length) return (
-    <div style={{ background: '#1a2338', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 10, padding: '10px 14px', boxShadow: '0 8px 24px rgba(0,0,0,0.5)' }}>
-      <div style={{ fontSize: 11, fontWeight: 700, color: 'rgba(255,255,255,0.5)', fontFamily: "'DM Mono',monospace", textTransform: 'uppercase', marginBottom: 4 }}>{label}</div>
-      <div style={{ fontSize: 16, fontWeight: 800, color: '#00d4ff' }}>{payload[0].value} оюутан</div>
-    </div>
-  );
-  return null;
-};
-
-export default function DashboardPage() {
-  const { user } = useAuth();
-  const [stats, setStats] = useState({ students: 0, teachers: 0, courses: 0, grades: 0, enrollments: 0 });
-  const [gradeData, setGradeData] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const cfg = ROLE_CFG[user?.role] || ROLE_CFG.STUDENT;
-
-  useEffect(() => {
-    (async () => {
-      try {
-        const [s, t, c, g, e] = await Promise.all([api.get('/students?limit=1'), api.get('/teachers?limit=1'), api.get('/courses?limit=1'), api.get('/grades'), api.get('/enrollments')]);
-        setStats({ students: s.data.meta?.total || 0, teachers: t.data.meta?.total || 0, courses: c.data.meta?.total || 0, grades: g.data.total || 0, enrollments: e.data.total || 0 });
-        const grades = g.data.data || [], dist = { A: 0, B: 0, C: 0, D: 0, F: 0 };
-        grades.forEach(gr => { if (dist[gr.grade] !== undefined) dist[gr.grade]++; });
-        setGradeData(Object.entries(dist).map(([name, value]) => ({ name, value })));
-      } catch (e) { console.error(e); }
-      finally { setLoading(false); }
-    })();
-  }, []);
-
-  if (loading) return (
-    <div style={{ padding: 28 }}>
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(190px,1fr))', gap: 14, marginBottom: 24 }}>
-        {[...Array(5)].map((_, i) => <SkeletonCard key={i} />)}
-      </div>
-    </div>
-  );
-
-  const chartAxisStyle = { fontSize: 11, fill: 'rgba(255,255,255,0.3)', fontFamily: "'DM Mono',monospace" };
-
+/* Decorative SVG hero strip */
+function HeroStrip() {
   return (
-    <div style={{ padding: '28px 28px 40px', minHeight: '100vh', background: '#0a0e1a' }}>
-
-      {/* Header */}
-      <div className="animate-slide-down" style={{ marginBottom: 28 }}>
-        <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12 }}>
-          <div>
-            <h1 style={{ fontSize: 24, fontWeight: 800, color: '#e8eaf0', margin: 0, letterSpacing: '-0.02em' }}>Dashboard</h1>
-            <p style={{ margin: '6px 0 0', fontSize: 12, fontFamily: "'DM Mono',monospace", color: 'rgba(255,255,255,0.35)' }}>
-              // Сайн байна уу, <span style={{ color: cfg.color, fontWeight: 700 }}>{user?.email}</span>
-              {' '}<span style={{ background: cfg.bg, color: cfg.color, border: `1px solid ${cfg.border}`, borderRadius: 999, fontSize: 10, padding: '1px 8px', fontWeight: 800 }}>{user?.role}</span>
-            </p>
-          </div>
-          <div style={{ background: '#141c2e', border: '1px solid rgba(255,255,255,0.06)', borderRadius: 10, padding: '8px 14px', textAlign: 'left' }}>
-            <div style={{ fontSize: 10, fontWeight: 700, color: 'rgba(255,255,255,0.3)', fontFamily: "'DM Mono',monospace", textTransform: 'uppercase', letterSpacing: '0.06em' }}>Нийт тоймлол</div>
-            <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.5)', marginTop: 2 }}>Өнөөдрийн байдлаар</div>
+    <div style={{ position:'relative', marginBottom:24, overflow:'hidden', height:72, background:'var(--navy)', display:'flex', alignItems:'center' }}>
+      {/* Full-width geometric SVG */}
+      <svg style={{ position:'absolute', inset:0, width:'100%', height:'100%' }} preserveAspectRatio="none" viewBox="0 0 1200 72" fill="none">
+        {/* Grid lines */}
+        {[0,60,120,180,240,300,360,420,480,540,600,660,720,780,840,900,960,1020,1080,1140,1200].map(x => (
+          <line key={x} x1={x} y1="0" x2={x} y2="72" stroke="rgba(255,255,255,0.04)" strokeWidth="1"/>
+        ))}
+        {[0,24,48,72].map(y => (
+          <line key={y} x1="0" y1={y} x2="1200" y2={y} stroke="rgba(255,255,255,0.04)" strokeWidth="1"/>
+        ))}
+        {/* Diagonal accent bars */}
+        <polygon points="0,72 120,0 160,0 40,72" fill="rgba(34,81,204,0.25)"/>
+        <polygon points="180,72 280,0 310,0 210,72" fill="rgba(34,81,204,0.12)"/>
+        <polygon points="340,72 420,0 440,0 360,72" fill="rgba(34,81,204,0.08)"/>
+        {/* Right side circles */}
+        <circle cx="1140" cy="36" r="50" fill="none" stroke="rgba(255,255,255,0.05)" strokeWidth="1"/>
+        <circle cx="1140" cy="36" r="32" fill="none" stroke="rgba(255,255,255,0.06)" strokeWidth="1"/>
+        <circle cx="1140" cy="36" r="14" fill="none" stroke="rgba(255,255,255,0.08)" strokeWidth="1"/>
+        <circle cx="1140" cy="36" r="3" fill="rgba(59,110,245,0.6)"/>
+        {/* Data dots row */}
+        {[500,540,560,590,620,650,680,720,760,800,840,880].map((x,i) => (
+          <circle key={x} cx={x} cy={36 - Math.sin(i * 0.8) * 14} r="2" fill={`rgba(59,110,245,${0.3 + i*0.05})`}/>
+        ))}
+        {/* Connecting line for dots */}
+        <polyline
+          points="500,36 540,22 560,42 590,28 620,18 650,32 680,20 720,38 760,24 800,36 840,28 880,36"
+          fill="none" stroke="rgba(59,110,245,0.4)" strokeWidth="1.5" strokeLinejoin="round"/>
+      </svg>
+      {/* Text content */}
+      <div style={{ position:'relative', zIndex:2, padding:'0 24px', display:'flex', alignItems:'center', gap:20 }}>
+        <div style={{ width:2, height:36, background:'var(--blue)' }}/>
+        <div>
+          <div style={{ fontFamily:'Share Tech Mono,monospace', fontSize:9, color:'rgba(245,240,232,0.35)', letterSpacing:'0.18em', marginBottom:4 }}>REAL-TIME OVERVIEW</div>
+          <div style={{ fontFamily:'Barlow Condensed,sans-serif', fontWeight:900, fontSize:22, color:'var(--beige)', textTransform:'uppercase', letterSpacing:'0.02em' }}>
+            Сургуулийн удирдлагын систем
           </div>
         </div>
       </div>
+    </div>
+  )
+}
 
-      {/* Stats */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(190px,1fr))', gap: 14, marginBottom: 20 }}>
-        <StatCard label="Сурагчид" value={stats.students} icon="👨‍🎓" accentColor="#00d4ff" delay={0.05} />
-        <StatCard label="Багш нар" value={stats.teachers} icon="👩‍🏫" accentColor="#c77dff" delay={0.10} />
-        <StatCard label="Хичээлүүд" value={stats.courses} icon="📚" accentColor="#6bcb77" delay={0.15} />
-        <StatCard label="Дүнгүүд" value={stats.grades} icon="📊" accentColor="#ffd93d" delay={0.20} />
-        <StatCard label="Бүртгэлүүд" value={stats.enrollments} icon="📋" accentColor="#ff6b6b" delay={0.25} />
-      </div>
+export default function DashboardPage() {
+  const { user } = useAuth()
+  const [stats, setStats]         = useState(null)
+  const [gradeData, setGradeData] = useState([])
+  const [attData, setAttData]     = useState({ present:0, absent:0, late:0, total:0 })
+  const [loading, setLoading]     = useState(true)
 
-      {/* Charts */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginBottom: 20 }}>
-        {[
-          {
-            title: 'Дүнгийн тархалт', delay: '0.3s', content: gradeData.length > 0 ? (
-              <ResponsiveContainer width="100%" height={210}>
-                <BarChart data={gradeData} barCategoryGap="32%">
-                  <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" vertical={false} />
-                  <XAxis dataKey="name" tick={chartAxisStyle} axisLine={false} tickLine={false} />
-                  <YAxis tick={chartAxisStyle} axisLine={false} tickLine={false} width={28} />
-                  <Tooltip content={<DarkTooltip />} cursor={{ fill: 'rgba(255,255,255,0.03)' }} />
-                  <Bar dataKey="value" radius={[6, 6, 0, 0]}>
-                    {gradeData.map((_, i) => <Cell key={i} fill={COLORS[i % COLORS.length]} />)}
-                  </Bar>
-                </BarChart>
-              </ResponsiveContainer>
-            ) : <p style={{ textAlign: 'center', color: 'rgba(255,255,255,0.2)', fontSize: 13, padding: '48px 0' }}>Дүн байхгүй</p>
-          },
-          {
-            title: 'Дүнгийн хуваарь', delay: '0.35s', content: gradeData.some(d => d.value > 0) ? (
-              <ResponsiveContainer width="100%" height={210}>
-                <PieChart>
-                  <Pie data={gradeData.filter(d => d.value > 0)} cx="50%" cy="48%" innerRadius={52} outerRadius={84} paddingAngle={3} dataKey="value">
-                    {gradeData.map((_, i) => <Cell key={i} fill={COLORS[i % COLORS.length]} />)}
-                  </Pie>
-                  <Tooltip contentStyle={{ background: '#1a2338', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 10, color: '#e8eaf0', fontSize: 12 }} formatter={(v, n) => [v, `Дүн ${n}`]} />
-                  <Legend formatter={v => <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.5)', fontFamily: "'DM Mono',monospace" }}>{v}</span>} />
-                </PieChart>
-              </ResponsiveContainer>
-            ) : <p style={{ textAlign: 'center', color: 'rgba(255,255,255,0.2)', fontSize: 13, padding: '48px 0' }}>Өгөгдөл байхгүй</p>
-          },
-        ].map((item, i) => (
-          <div key={i} className="animate-fade-in" style={{ animationDelay: item.delay, background: '#141c2e', borderRadius: 16, border: '1px solid rgba(255,255,255,0.06)', padding: '20px 20px 12px', boxShadow: '0 2px 8px rgba(0,0,0,0.4)' }}>
-            <div style={{ fontSize: 10, fontWeight: 700, color: 'rgba(255,255,255,0.3)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 16, fontFamily: "'DM Mono',monospace" }}>{item.title}</div>
-            {item.content}
+  useEffect(() => {
+    Promise.all([
+      api.get('/students?limit=1'),
+      api.get('/teachers?limit=1'),
+      api.get('/courses?limit=1'),
+      api.get('/grades'),
+      api.get('/enrollments'),
+      api.get('/attendance'),
+    ]).then(([s,t,c,g,e,a]) => {
+      setStats({
+        students:    s.data.meta?.total ?? 0,
+        teachers:    t.data.meta?.total ?? 0,
+        courses:     c.data.meta?.total ?? 0,
+        grades:      g.data.total ?? 0,
+        enrollments: e.data.total ?? 0,
+      })
+      const dist = { A:0,B:0,C:0,D:0,F:0 }
+      ;(g.data.data||[]).forEach(gr => { if(dist[gr.grade]!==undefined) dist[gr.grade]++ })
+      setGradeData(Object.entries(dist).map(([name,value]) => ({name,value})))
+
+      const att = a.data.data || []
+      const present = att.filter(x => x.status==='PRESENT').length
+      const absent  = att.filter(x => x.status==='ABSENT').length
+      const late    = att.filter(x => x.status==='LATE').length
+      setAttData({ present, absent, late, total:att.length })
+    }).catch(console.error).finally(() => setLoading(false))
+  }, [])
+
+  const ROLE_MN = { ADMIN:'ADMIN', TEACHER:'БАГШ', STUDENT:'СУРАГЧ' }
+  const attRate = attData.total > 0 ? Math.round((attData.present / attData.total) * 100) : 0
+
+  return (
+    <div>
+      <HeroStrip />
+
+      <div className="page" style={{ paddingTop:0 }}>
+        <PageHeader
+          eyebrow="ЕРӨНХИЙ ТОЙМ"
+          titleMain="DASH"
+          titleDim="BOARD"
+          action={
+            <div style={{ textAlign:'right' }}>
+              <div className="t-label" style={{ marginBottom:6 }}>SIGNED IN AS</div>
+              <div style={{ fontFamily:'Barlow,sans-serif', fontSize:13, color:'var(--text-main)', fontWeight:500 }}>{user?.email}</div>
+              <div className="badge badge-navy" style={{ marginTop:6 }}>{ROLE_MN[user?.role]}</div>
+            </div>
+          }
+        />
+
+        {/* STAT CARDS */}
+        {loading ? <SkeletonCards n={5} /> : (
+          <div className="anim-fade" style={{ display:'grid', gridTemplateColumns:'repeat(5,1fr)', gap:12, marginBottom:20 }}>
+            <StatCard label="Сурагчид"    value={stats.students}    dark delay={0.00} ring={stats.students} ringMax={300}/>
+            <StatCard label="Багш нар"    value={stats.teachers}    delay={0.06} ring={stats.teachers} ringMax={50}/>
+            <StatCard label="Хичээлүүд"  value={stats.courses}     delay={0.09} ring={stats.courses} ringMax={30}/>
+            <StatCard label="Дүнгүүд"    value={stats.grades}      delay={0.12} ring={stats.grades} ringMax={500}/>
+            <StatCard label="Бүртгэлүүд"  value={stats.enrollments} delay={0.15} ring={stats.enrollments} ringMax={600}/>
           </div>
-        ))}
+        )}
+
+        {/* CHARTS */}
+        {!loading && (
+          <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:16, marginBottom:20 }}>
+
+            {/* Grade distribution bar chart */}
+            <div className="card anim-fade" style={{ animationDelay:'0.2s', position:'relative', overflow:'hidden' }}>
+              {/* Decorative background SVG */}
+              <svg style={{ position:'absolute', bottom:0, right:0, opacity:0.04, pointerEvents:'none' }} width="120" height="120" viewBox="0 0 120 120">
+                <circle cx="120" cy="120" r="100" fill="none" stroke="var(--navy)" strokeWidth="1"/>
+                <circle cx="120" cy="120" r="70"  fill="none" stroke="var(--navy)" strokeWidth="1"/>
+                <circle cx="120" cy="120" r="40"  fill="none" stroke="var(--navy)" strokeWidth="1"/>
+              </svg>
+              <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:16, position:'relative' }}>
+                <div>
+                  <div className="t-label" style={{ marginBottom:4 }}>СТАТИСТИК</div>
+                  <div style={{ fontFamily:'Barlow Condensed,sans-serif', fontWeight:900, fontSize:20, textTransform:'uppercase', color:'var(--text-main)' }}>ДҮНГИЙН ТАРХАЛТ</div>
+                </div>
+                <div style={{ width:3, height:24, background:'var(--navy)' }}/>
+              </div>
+              <BarGraph data={gradeData} height={180} />
+            </div>
+
+            {/* Attendance + grade breakdown on dark card */}
+            <div className="card-navy anim-fade" style={{ animationDelay:'0.26s', position:'relative', overflow:'hidden' }}>
+              {/* Background grid SVG */}
+              <svg style={{ position:'absolute', inset:0, width:'100%', height:'100%', opacity:1, pointerEvents:'none' }} preserveAspectRatio="none">
+                {[0,40,80,120,160,200,240].map(y => (
+                  <line key={y} x1="0" y1={y} x2="100%" y2={y} stroke="rgba(255,255,255,0.03)" strokeWidth="1"/>
+                ))}
+                {/* Diagonal accent */}
+                <line x1="0" y1="100%" x2="100%" y2="0" stroke="rgba(255,255,255,0.03)" strokeWidth="1"/>
+              </svg>
+
+              <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:20, position:'relative' }}>
+                <div>
+                  <div className="t-label" style={{ color:'rgba(245,240,232,0.3)', marginBottom:4 }}>МЭДЭЭЛЭЛ</div>
+                  <div style={{ fontFamily:'Barlow Condensed,sans-serif', fontWeight:900, fontSize:20, textTransform:'uppercase', color:'var(--beige)' }}>ДҮНГИЙН ХАРЬЦАА</div>
+                </div>
+                {/* Attendance ring */}
+                <div style={{ position:'relative' }}>
+                  <svg width="64" height="64" viewBox="0 0 64 64">
+                    <circle cx="32" cy="32" r="27" fill="none" stroke="rgba(245,240,232,0.08)" strokeWidth="5"/>
+                    <circle cx="32" cy="32" r="27" fill="none" stroke="rgba(245,240,232,0.55)" strokeWidth="5"
+                      strokeDasharray={`${attRate / 100 * 2 * Math.PI * 27} ${2 * Math.PI * 27}`}
+                      strokeDashoffset={2 * Math.PI * 27 * 0.25}
+                      strokeLinecap="square"
+                    />
+                    <text x="32" y="32" textAnchor="middle" dominantBaseline="central"
+                      fontFamily="Barlow Condensed,sans-serif" fontWeight="900" fontSize="14" fill="rgba(245,240,232,0.8)">
+                      {attRate}%
+                    </text>
+                  </svg>
+                  <div style={{ fontFamily:'Share Tech Mono,monospace', fontSize:8, color:'rgba(245,240,232,0.3)', letterSpacing:'0.1em', textAlign:'center', marginTop:2 }}>ИРЦ</div>
+                </div>
+              </div>
+
+              <div style={{ position:'relative' }}>
+                {gradeData.map((d,i) => {
+                  const max   = Math.max(...gradeData.map(x => x.value), 1)
+                  const pct   = max > 0 ? (d.value / max) * 100 : 0
+                  const colors= ['rgba(245,240,232,0.85)','rgba(144,170,221,0.85)','rgba(96,128,187,0.85)','rgba(245,240,232,0.4)','rgba(245,240,232,0.18)']
+                  return (
+                    <div key={d.name} style={{ display:'flex', alignItems:'center', gap:10, marginBottom:12 }}>
+                      <span style={{ fontFamily:'Barlow Condensed,sans-serif', fontWeight:800, fontSize:13, color:'rgba(245,240,232,0.55)', width:18 }}>{d.name}</span>
+                      <div style={{ flex:1, background:'rgba(245,240,232,0.07)', height:8, position:'relative' }}>
+                        <div style={{ height:'100%', width:`${pct}%`, background:colors[i], transition:'width 0.7s cubic-bezier(.4,0,.2,1)' }}>
+                          {/* Hatch on bar */}
+                          <svg style={{ position:'absolute', inset:0, width:'100%', height:'100%', opacity:0.2 }} preserveAspectRatio="none">
+                            {[0,8,16,24].map(x => <line key={x} x1={x} y1="0" x2={x-8} y2="100%" stroke="white" strokeWidth="3"/>)}
+                          </svg>
+                        </div>
+                      </div>
+                      <span style={{ fontFamily:'Share Tech Mono,monospace', fontSize:9, color:'rgba(245,240,232,0.3)', width:24, textAlign:'right' }}>{d.value}</span>
+                    </div>
+                  )
+                })}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Attendance mini strip */}
+        {!loading && attData.total > 0 && (
+          <div className="anim-fade" style={{ animationDelay:'0.32s', marginBottom:20, background:'var(--bg-card)', border:'1.5px solid var(--border-light)', padding:'16px 20px', position:'relative', overflow:'hidden' }}>
+            {/* SVG background */}
+            <svg style={{ position:'absolute', right:0, top:0, height:'100%', opacity:0.04, pointerEvents:'none' }} width="200" viewBox="0 0 200 80">
+              {[20,50,80,110,140,170,200].map(x => <line key={x} x1={x} y1="0" x2={x} y2="80" stroke="var(--navy)" strokeWidth="1"/>)}
+            </svg>
+            <div style={{ display:'flex', alignItems:'center', gap:24, position:'relative' }}>
+              <div>
+                <div className="t-label" style={{ marginBottom:4 }}>ИРЦИЙН ДҮГНЭЛТ</div>
+                <div style={{ fontFamily:'Barlow Condensed,sans-serif', fontWeight:900, fontSize:32, color:'var(--text-main)', lineHeight:1 }}>{attRate}%</div>
+              </div>
+              <div style={{ flex:1 }}>
+                {[
+                  { label:'ИРСЭН',    val:attData.present, max:attData.total, color:'var(--text-main)' },
+                  { label:'ИРЭЭГҮЙ', val:attData.absent,  max:attData.total, color:'var(--red)' },
+                  { label:'ХОЦОРСОН',val:attData.late,    max:attData.total, color:'var(--amber)' },
+                ].map(r => (
+                  <div key={r.label} style={{ display:'flex', alignItems:'center', gap:10, marginBottom:6 }}>
+                    <div style={{ fontFamily:'Share Tech Mono,monospace', fontSize:9, color:'var(--text-muted)', letterSpacing:'0.08em', width:72 }}>{r.label}</div>
+                    <div style={{ flex:1, background:'var(--beige-mid)', height:7, position:'relative' }}>
+                      <div style={{ position:'absolute', top:0, left:0, height:'100%', width:`${r.max>0?(r.val/r.max)*100:0}%`, background:r.color, transition:'width 0.7s' }}/>
+                    </div>
+                    <div style={{ fontFamily:'Barlow Condensed,sans-serif', fontWeight:800, fontSize:14, color:'var(--text-main)', minWidth:30, textAlign:'right' }}>{r.val}</div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Info row */}
+        {!loading && (
+          <div className="anim-fade" style={{ display:'grid', gridTemplateColumns:'repeat(3,1fr)', gap:12, animationDelay:'0.36s' }}>
+            {[
+              { idx:'A', label:'Таны эрх',  val:ROLE_MN[user?.role] || user?.role },
+              { idx:'B', label:'И-мэйл',    val:user?.email },
+              { idx:'C', label:'Систем',    val:'School Manager v2.0' },
+            ].map(item => (
+              <div key={item.idx} className="card" style={{ display:'flex', alignItems:'flex-start', gap:12, position:'relative', overflow:'hidden' }}>
+                {/* Corner SVG accent */}
+                <svg style={{ position:'absolute', top:0, left:0, opacity:0.06 }} width="40" height="40" viewBox="0 0 40 40">
+                  <line x1="0" y1="40" x2="40" y2="0" stroke="var(--navy)" strokeWidth="1"/>
+                  <line x1="0" y1="20" x2="20" y2="0" stroke="var(--navy)" strokeWidth="0.5"/>
+                </svg>
+                <div style={{ width:34, height:34, background:'var(--navy)', flexShrink:0, display:'flex', alignItems:'center', justifyContent:'center', fontFamily:'Barlow Condensed,sans-serif', fontWeight:900, fontSize:17, color:'var(--beige)' }}>{item.idx}</div>
+                <div style={{ minWidth:0 }}>
+                  <div className="t-label" style={{ marginBottom:4 }}>{item.label}</div>
+                  <div style={{ fontFamily:'Barlow Condensed,sans-serif', fontWeight:800, fontSize:14, color:'var(--text-main)', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{item.val}</div>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
     </div>
-  );
+  )
 }

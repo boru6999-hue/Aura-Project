@@ -1,151 +1,115 @@
-import { useState, useEffect, useCallback } from 'react';
-import api from '../api/axios';
-import { useAuth } from '../context/AuthContext';
-import { useToast } from '../components/Toast';
-import Modal from '../components/Modal';
-import { SkeletonCard } from '../components/Skeleton';
+import { useState, useEffect, useCallback } from 'react'
+import api from '../api/axios'
+import { useAuth } from '../context/AuthContext'
+import { useToast } from '../components/Toast'
+import Modal from '../components/Modal'
+import { PageHeader, SkeletonTable, Empty, ActBtn, Code, Pagination, Spinner } from '../components/UI'
+
+const EMPTY = { name:'', description:'', credits:3, teacherId:'' }
 
 export default function CoursesPage() {
-  const { isAdmin, isTeacher } = useAuth();
-  const { show: toast } = useToast();
-  const [courses, setCourses]   = useState([]);
-  const [teachers, setTeachers] = useState([]);
-  const [meta, setMeta]         = useState({});
-  const [search, setSearch]     = useState('');
-  const [page, setPage]         = useState(1);
-  const [loading, setLoading]   = useState(true);
-  const [cached, setCached]     = useState(false);
-  const [showModal, setShowModal] = useState(false);
-  const [form, setForm]         = useState({ name:'', description:'', credits:3, teacherId:'' });
-  const [editId, setEditId]     = useState(null);
-  const [submitting, setSubmitting] = useState(false);
+  const { isAdmin } = useAuth()
+  const { show: toast } = useToast()
+  const [rows, setRows]       = useState([])
+  const [meta, setMeta]       = useState({})
+  const [teachers, setTeachers] = useState([])
+  const [search, setSearch]   = useState('')
+  const [page, setPage]       = useState(1)
+  const [loading, setLoading] = useState(true)
+  const [modal, setModal]     = useState(false)
+  const [form, setForm]       = useState(EMPTY)
+  const [editId, setEditId]   = useState(null)
+  const [saving, setSaving]   = useState(false)
 
-  const fetch = useCallback(async () => {
-    setLoading(true);
+  const load = useCallback(async () => {
+    setLoading(true)
     try {
-      const res = await api.get('/courses', { params: { search, page, limit: 9 } });
-      setCourses(res.data.data); setMeta(res.data.meta); setCached(res.data.cached);
-    } catch { toast('Хичээлүүд ачааллахад алдаа гарлаа', 'error'); }
-    finally { setLoading(false); }
-  }, [search, page]);
+      const [r, t] = await Promise.all([
+        api.get('/courses', { params:{ search, page, limit:12 } }),
+        api.get('/teachers?limit=100'),
+      ])
+      setRows(r.data.data); setMeta(r.data.meta); setTeachers(t.data.data || [])
+    } catch { toast('Ачааллахад алдаа гарлаа', 'error') }
+    finally { setLoading(false) }
+  }, [search, page])
 
-  useEffect(() => { fetch(); }, [fetch]);
-  useEffect(() => { api.get('/teachers?limit=100').then(r=>setTeachers(r.data.data)).catch(()=>{}); }, []);
+  useEffect(() => { load() }, [load])
 
-  const openCreate = () => { setForm({ name:'', description:'', credits:3, teacherId:'' }); setEditId(null); setShowModal(true); };
-  const openEdit   = (c) => { setForm({ name:c.name, description:c.description||'', credits:c.credits, teacherId:c.teacherId||'' }); setEditId(c.id); setShowModal(true); };
+  const openCreate = () => { setForm(EMPTY); setEditId(null); setModal(true) }
+  const openEdit   = c => { setForm({ name:c.name, description:c.description||'', credits:c.credits, teacherId:c.teacherId||'' }); setEditId(c.id); setModal(true) }
 
-  const handleSubmit = async (e) => {
-    e.preventDefault(); setSubmitting(true);
+  const save = async e => {
+    e.preventDefault(); setSaving(true)
     try {
-      if (editId) { await api.put(`/courses/${editId}`, form); toast('Хичээл шинэчлэгдлээ', 'success'); }
-      else         { await api.post('/courses', form);          toast('Хичээл амжилттай нэмэгдлээ 🎉', 'success'); }
-      setShowModal(false); fetch();
-    } catch (err) { toast(err.response?.data?.error || 'Алдаа гарлаа', 'error'); }
-    finally { setSubmitting(false); }
-  };
+      const body = { ...form, credits: Number(form.credits), teacherId: form.teacherId ? Number(form.teacherId) : null }
+      if (editId) { await api.put(`/courses/${editId}`, body); toast('Шинэчлэгдлээ', 'success') }
+      else        { await api.post('/courses', body); toast('Нэмэгдлээ', 'success') }
+      setModal(false); load()
+    } catch (err) { toast(err.response?.data?.error || 'Алдаа', 'error') }
+    finally { setSaving(false) }
+  }
 
-  const handleDelete = async (id, name) => {
-    if (!confirm(`"${name}" хичээлийг устгах уу?`)) return;
-    try { await api.delete(`/courses/${id}`); toast(`${name} устгагдлаа`, 'info'); fetch(); }
-    catch (err) { toast(err.response?.data?.error||'Устгахад алдаа гарлаа','error'); }
-  };
-
-  const creditColor = (n) => n >= 4 ? 'bg-rose-100 text-rose-700' : n === 3 ? 'bg-indigo-100 text-indigo-700' : 'bg-slate-100 text-slate-600';
+  const del = async (id, name) => {
+    if (!confirm(`"${name}" устгах уу?`)) return
+    try { await api.delete(`/courses/${id}`); toast(`${name} устгагдлаа`, 'info'); load() }
+    catch (err) { toast(err.response?.data?.error || 'Устгахад алдаа', 'error') }
+  }
 
   return (
-    <div className="animate-fade-in" style={{ padding:"28px", minHeight:"100vh", background:"#0a0e1a" }}>
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold">Хичээлүүд</h1>
-          <p className="text-sm text-[rgba(255,255,255,0.35)] mt-0.5 flex items-center gap-2">
-            {meta.total||0} нийт хичээл
-            {cached && <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs bg-amber-100 text-amber-700 font-semibold">⚡ Кэшлэгдсэн</span>}
-          </p>
-        </div>
-        {(isAdmin||isTeacher) && <button onClick={openCreate} className="btn-primary animate-bounce-in">＋ Нэмэх</button>}
+    <div className="page">
+      <PageHeader eyebrow="СУРГАЛТ" titleMain="ХИЧЭЭЛ" titleDim="ҮҮД" meta={`${meta.total||0} нийт хичээл`}
+        action={isAdmin && <button className="btn btn-primary" onClick={openCreate}>＋ НЭМЭХ</button>} />
+      <div style={{ marginBottom:14 }}>
+        <input className="input" style={{ maxWidth:320 }} placeholder="Хичээл хайх..." value={search} onChange={e => { setSearch(e.target.value); setPage(1) }} />
       </div>
-
-      <div className="card p-4 animate-slide-down">
-        <input placeholder="Хичээл хайх..." value={search}
-          onChange={e=>{ setSearch(e.target.value); setPage(1); }}
-          className="input-field max-w-sm" />
-      </div>
-
-      {loading ? (
-        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-          {[...Array(6)].map((_,i) => <SkeletonCard key={i} />)}
-        </div>
-      ) : courses.length === 0 ? (
-        <div className="card text-center py-16 animate-scale-in">
-          <span className="text-5xl">📚</span>
-          <p className="text-[rgba(255,255,255,0.25)] mt-3 font-medium">Хичээл олдсонгүй</p>
-        </div>
-      ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4 stagger">
-          {courses.map((c, i) => (
-            <div key={c.id}
-              className="card hover:shadow-lg transition-all duration-300 hover:-translate-y-1 group animate-fade-in"
-              style={{ animationDelay: `${i * 0.06}s` }}>
-              <div className="flex items-start justify-between mb-3">
-                <span className="font-mono text-xs text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded-lg font-semibold">{c.courseCode}</span>
-                <span className={`text-xs font-bold px-2.5 py-0.5 rounded-full ${creditColor(c.credits)}`}>{c.credits} кредит</span>
-              </div>
-              <h3 className="font-bold text-[#e8eaf0] mb-1 group-hover:text-indigo-700 transition-colors">{c.name}</h3>
-              {c.description && <p className="text-xs text-[rgba(255,255,255,0.25)] mb-3 line-clamp-2">{c.description}</p>}
-              <div className="space-y-1 text-xs text-[rgba(255,255,255,0.35)] mb-4">
-                <div className="flex items-center gap-1.5">
-                  <span>👩‍🏫</span>
-                  <span>{c.teacher ? `${c.teacher.firstName} ${c.teacher.lastName}` : 'Багш оноогдоогүй'}</span>
-                </div>
-                <div className="flex items-center gap-1.5">
-                  <span>👥</span>
-                  <span>{c._count?.enrollments||0} сурагч бүртгэлтэй</span>
-                </div>
-              </div>
-              {(isAdmin||isTeacher) && (
-                <div className="flex gap-2 pt-3 border-t border-[rgba(255,255,255,0.05)]">
-                  <button onClick={()=>openEdit(c)} className="text-xs text-indigo-600 hover:text-indigo-800 font-semibold px-2.5 py-1.5 rounded-lg hover:bg-indigo-50 transition-all flex-1 text-center">Засах</button>
-                  {isAdmin && <button onClick={()=>handleDelete(c.id, c.name)} className="text-xs text-red-500 hover:text-red-700 font-semibold px-2.5 py-1.5 rounded-lg hover:bg-red-50 transition-all flex-1 text-center">Устгах</button>}
-                </div>
-              )}
-            </div>
-          ))}
+      {loading ? <SkeletonTable rows={8} cols={6} /> : rows.length === 0 ? <Empty /> : (
+        <div className="anim-fade" style={{ background:'var(--bg-card)', border:'1.5px solid var(--border-light)', overflowX:'auto' }}>
+          <table className="tbl">
+            <thead><tr>{['КОД','НЭР','КРЕДИТ','БАГШ','БҮРТГЭЛ','ҮЙЛДЭЛ'].map(h => <th key={h}>{h}</th>)}</tr></thead>
+            <tbody>
+              {rows.map(c => (
+                <tr key={c.id}>
+                  <td><Code>{c.courseCode}</Code></td>
+                  <td style={{ fontWeight:600, maxWidth:200 }}>
+                    <div>{c.name}</div>
+                    {c.description && <div style={{ fontFamily:'Barlow,sans-serif', fontWeight:400, fontSize:11, color:'var(--text-faint)', marginTop:2 }}>{c.description.slice(0,60)}{c.description.length > 60 ? '...' : ''}</div>}
+                  </td>
+                  <td><span className="badge badge-beige">{c.credits} CR</span></td>
+                  <td style={{ color:'var(--text-muted)' }}>{c.teacher ? `${c.teacher.firstName} ${c.teacher.lastName}` : '—'}</td>
+                  <td><span className="badge badge-navy">{c._count?.enrollments||0}</span></td>
+                  <td>
+                    {isAdmin && <div style={{ display:'flex', gap:6 }}>
+                      <ActBtn label="ЗАСАХ" onClick={() => openEdit(c)} />
+                      <ActBtn label="УСТГАХ" danger onClick={() => del(c.id, c.name)} />
+                    </div>}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
         </div>
       )}
-
-      {meta.totalPages > 1 && (
-        <div className="flex items-center justify-between animate-fade-in">
-          <p className="text-sm text-[rgba(255,255,255,0.35)]">{meta.page}/{meta.totalPages} хуудас</p>
-          <div className="flex gap-2">
-            <button disabled={page<=1} onClick={()=>setPage(p=>p-1)} className="btn-secondary text-sm py-1.5 disabled:opacity-40">← Өмнөх</button>
-            <button disabled={page>=meta.totalPages} onClick={()=>setPage(p=>p+1)} className="btn-secondary text-sm py-1.5 disabled:opacity-40">Дараах →</button>
-          </div>
-        </div>
-      )}
-
-      {showModal && (
-        <Modal title={editId ? 'Хичээл засах' : 'Хичээл нэмэх'} onClose={()=>setShowModal(false)}>
-          <form onSubmit={handleSubmit} className="space-y-4">
-            <div><label className="block text-sm font-semibold text-[rgba(255,255,255,0.7)] mb-1.5">Хичээлийн нэр *</label><input className="input-field" value={form.name} onChange={e=>setForm({...form,name:e.target.value})} required /></div>
-            <div><label className="block text-sm font-semibold text-[rgba(255,255,255,0.7)] mb-1.5">Тайлбар</label><textarea className="input-field resize-none" rows={3} value={form.description} onChange={e=>setForm({...form,description:e.target.value})} /></div>
-            <div><label className="block text-sm font-semibold text-[rgba(255,255,255,0.7)] mb-1.5">Кредит</label><input type="number" min="1" max="10" className="input-field" value={form.credits} onChange={e=>setForm({...form,credits:e.target.value})} /></div>
+      <Pagination page={page} totalPages={meta.totalPages} onPage={setPage} />
+      {modal && (
+        <Modal title={editId ? 'Хичээл засах' : 'Хичээл нэмэх'} onClose={() => setModal(false)}>
+          <form onSubmit={save} style={{ display:'contents' }}>
+            <div><label className="form-label">Нэр *</label><input className="input" value={form.name} onChange={e=>setForm({...form,name:e.target.value})} required /></div>
+            <div><label className="form-label">Тайлбар</label><textarea className="input" rows={3} style={{ resize:'none' }} value={form.description} onChange={e=>setForm({...form,description:e.target.value})} /></div>
+            <div><label className="form-label">Кредит</label><input className="input" type="number" min="1" max="10" value={form.credits} onChange={e=>setForm({...form,credits:e.target.value})} /></div>
             <div>
-              <label className="block text-sm font-semibold text-[rgba(255,255,255,0.7)] mb-1.5">Багш</label>
-              <select className="input-field" value={form.teacherId} onChange={e=>setForm({...form,teacherId:e.target.value})}>
-                <option value="">Багш оноогдоогүй</option>
-                {teachers.map(t=><option key={t.id} value={t.id}>{t.firstName} {t.lastName}</option>)}
+              <label className="form-label">Багш</label>
+              <select className="input" value={form.teacherId} onChange={e=>setForm({...form,teacherId:e.target.value})}>
+                <option value="">Сонгоно уу</option>
+                {teachers.map(t => <option key={t.id} value={t.id}>{t.firstName} {t.lastName}</option>)}
               </select>
             </div>
-            <div className="flex gap-3 pt-2">
-              <button type="submit" disabled={submitting} className="btn-primary flex-1">
-                {submitting ? <span className="flex items-center justify-center gap-2"><span className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"/>Хадгалж байна...</span> : (editId?'Шинэчлэх':'Нэмэх')}
-              </button>
-              <button type="button" onClick={()=>setShowModal(false)} className="btn-secondary flex-1">Болих</button>
+            <div style={{ display:'flex', gap:10, paddingTop:4 }}>
+              <button type="submit" disabled={saving} className="btn btn-primary" style={{ flex:1 }}>{saving ? <Spinner /> : editId ? 'ШИНЭЧЛЭХ' : 'НЭМЭХ'}</button>
+              <button type="button" onClick={() => setModal(false)} className="btn btn-ghost" style={{ flex:1 }}>БОЛИХ</button>
             </div>
           </form>
         </Modal>
       )}
     </div>
-  );
+  )
 }
